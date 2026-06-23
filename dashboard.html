@@ -266,26 +266,38 @@ function initChart() {
 
 async function loadCandles(ticker, resolution) {
   document.getElementById('chart-ticker').textContent = ticker;
-  const to = Math.floor(Date.now() / 1000);
-  const days = resolution === 'D' ? 180 : resolution === 'W' ? 365 : 730;
-  const from = to - days * 86400;
+  document.getElementById('chart-price').textContent = '...';
+  const rangeMap = { 'D': '6mo', 'W': '1y', 'M': '2y' };
+  const intervalMap = { 'D': '1d', 'W': '1wk', 'M': '1mo' };
+  const range = rangeMap[resolution];
+  const interval = intervalMap[resolution];
   try {
-    const res = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_KEY}`);
-    const d = await res.json();
-    if (d.s !== 'ok' || !d.t) { candleSeries.setData([]); return; }
-    const candles = d.t.map((t, i) => ({
-      time: t, open: d.o[i], high: d.h[i], low: d.l[i], close: d.c[i]
-    }));
-    const vols = d.t.map((t, i) => ({
-      time: t, value: d.v[i],
-      color: d.c[i] >= d.o[i] ? '#3fb95044' : '#f8514944'
-    }));
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=${range}&interval=${interval}&includePrePost=false`;
+    const res = await fetch(url);
+    const json = await res.json();
+    const result = json.chart.result[0];
+    const timestamps = result.timestamp;
+    const ohlcv = result.indicators.quote[0];
+
+    const candles = timestamps.map((t, i) => ({
+      time: t,
+      open: +ohlcv.open[i].toFixed(2),
+      high: +ohlcv.high[i].toFixed(2),
+      low: +ohlcv.low[i].toFixed(2),
+      close: +ohlcv.close[i].toFixed(2),
+    })).filter(c => c.open && c.high && c.low && c.close);
+
+    const vols = timestamps.map((t, i) => ({
+      time: t,
+      value: ohlcv.volume[i] || 0,
+      color: (ohlcv.close[i] >= ohlcv.open[i]) ? '#3fb95044' : '#f8514944'
+    })).filter(v => v.value);
+
     candleSeries.setData(candles);
     volumeSeries.setData(vols);
-    // Draw SL/TP lines for open trades on this ticker
     drawTradeLevels(ticker);
     chart.timeScale().fitContent();
-    // Update header price
+
     const last = candles[candles.length - 1];
     const prev = candles[candles.length - 2];
     const chg = last.close - prev.close;
@@ -297,7 +309,8 @@ async function loadCandles(ticker, resolution) {
     prices[ticker] = last.close;
     updateWatchlistRow(ticker, last.close, chgPct);
   } catch(e) {
-    console.error(e);
+    console.error('Chart load error:', e);
+    document.getElementById('chart-price').textContent = 'Error loading';
   }
 }
 
