@@ -30,7 +30,7 @@ def build_html_email(results, paper_summary, dashboard_url, starting_balance_jpy
         tp = round(price * (1 + tp_pct / 100), 2)
         account_usd = starting_balance_jpy / usd_jpy_rate
         risk_usd = round(account_usd * risk_pct / 100, 2)
-        position_usd = round(risk_usd / (abs(sl_pct) / 100), 2)
+        position_usd = round(min(risk_usd / (abs(sl_pct) / 100), account_usd * 0.20), 2)
         shares = round(position_usd / price, 4)
         max_loss = round(position_usd * abs(sl_pct) / 100, 2)
         max_gain = round(position_usd * tp_pct / 100, 2)

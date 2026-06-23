@@ -404,11 +404,13 @@ function calcAccount(filterFn) {
   const wins = closed.filter(t => t.status === 'target_hit');
   const losses = closed.filter(t => t.status === 'stopped_out');
 
-  // Position size per trade: risk 5% of account / sl%
+  // Position size: risk 5% of account / sl%, capped at 20% of account
   const RISK_PCT = 0.05;
+  const MAX_POSITION_PCT = 0.20;
   function positionUSD(t) {
     const riskUSD = STARTING_USD * RISK_PCT;
-    return riskUSD / (Math.abs(t.sl_pct) / 100);
+    const raw = riskUSD / (Math.abs(t.sl_pct) / 100);
+    return Math.min(raw, STARTING_USD * MAX_POSITION_PCT);
   }
 
   // Cash = starting - invested in open trades + realized P&L from closed

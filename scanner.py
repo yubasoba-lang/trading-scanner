@@ -104,7 +104,7 @@ def format_report(results: list) -> str:
             # Position sizing — risk only 5% of account per trade
             account_usd = STARTING_BALANCE_JPY / USD_JPY_RATE
             risk_usd = round(account_usd * RISK_PER_TRADE_PCT / 100, 2)
-            position_usd = round(risk_usd / (abs(sl_pct) / 100), 2)
+            position_usd = round(min(risk_usd / (abs(sl_pct) / 100), account_usd * 0.20), 2)
             shares = round(position_usd / price, 4)
             max_loss_usd = round(position_usd * abs(sl_pct) / 100, 2)
             max_gain_usd = round(position_usd * tp_pct / 100, 2)
