@@ -17,20 +17,18 @@ def save_log(trades):
         json.dump(trades, f, indent=2)
 
 
-SLIPPAGE_PCT = 0.001  # 0.1% slippage on entry — pessimistic but realistic for retail
+SLIPPAGE_PCT = 0.001
 
 
 def log_signal(ticker, price, score, bias, sl, tp, sl_pct, tp_pct, atr_pct, earnings_warning=False):
     trades = load_log()
     today = datetime.now().strftime("%Y-%m-%d")
-    # Don't log duplicate signals for same ticker on same day
     if any(t["ticker"] == ticker and t["date"] == today for t in trades):
         return
-    # Apply slippage: you never get the exact close price, you pay a little more
     fill_price = round(price * (1 + SLIPPAGE_PCT), 2)
     trades.append({
         "id": len(trades) + 1,
-        "date": datetime.now().strftime("%Y-%m-%d"),
+        "date": today,
         "ticker": ticker,
         "entry_price": fill_price,
         "score": score,
@@ -50,7 +48,6 @@ def log_signal(ticker, price, score, bias, sl, tp, sl_pct, tp_pct, atr_pct, earn
 
 
 def update_outcomes():
-    """Check open trades against latest prices and mark closed if SL/TP hit."""
     import yfinance as yf
     trades = load_log()
     open_trades = [t for t in trades if t["status"] == "open"]
@@ -90,37 +87,15 @@ def summary():
     trades = load_log()
     closed = [t for t in trades if t["status"] != "open"]
     open_trades = [t for t in trades if t["status"] == "open"]
-
-    if not trades:
-        return "No trades logged yet."
-
     wins = [t for t in closed if t["status"] == "target_hit"]
     losses = [t for t in closed if t["status"] == "stopped_out"]
-    total_pct = sum(t["result_pct"] for t in closed) if closed else 0
+    total_pct = sum(t["result_pct"] for t in closed if t["result_pct"]) if closed else 0
     win_rate = round(len(wins) / len(closed) * 100) if closed else 0
 
     lines = [
-        f"PAPER TRADE LOG — {datetime.now().strftime('%Y-%m-%d')}",
-        "=" * 45,
-        f"Total signals logged: {len(trades)}",
-        f"Open:   {len(open_trades)}",
-        f"Closed: {len(closed)}  (W:{len(wins)} L:{len(losses)}  WR:{win_rate}%)",
-        f"Total P&L (paper): {'+' if total_pct >= 0 else ''}{round(total_pct, 1)}%",
-        "",
-        "OPEN TRADES",
-        "-" * 45,
+        f"Open: {len(open_trades)}  Closed: {len(closed)}  W:{len(wins)} L:{len(losses)}  WR:{win_rate}%",
+        f"Total P&L: {'+' if total_pct >= 0 else ''}{round(total_pct, 1)}%",
     ]
-
     for t in open_trades:
-        lines.append(f"  {t['ticker']:6} entry ${t['entry_price']}  SL ${t['sl']}  TP ${t['tp']}  logged {t['date']}")
-
-    if closed:
-        lines.append("")
-        lines.append("CLOSED TRADES")
-        lines.append("-" * 45)
-        for t in closed[-10:]:
-            result = f"+{t['result_pct']}%" if t['result_pct'] > 0 else f"{t['result_pct']}%"
-            status = "✓ TP" if t['status'] == "target_hit" else "✗ SL"
-            lines.append(f"  {t['ticker']:6} {status}  {result}  exited {t['exit_date']}")
-
+        lines.append(f"  {t['ticker']} entry ${t['entry_price']}  SL ${t['sl']}  TP ${t['tp']}")
     return "\n".join(lines)
