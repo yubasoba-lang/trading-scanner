@@ -133,6 +133,7 @@
       <div class="acct-name">SYSTEM ACCOUNT</div>
       <div class="acct-val" id="sys-val">¥60,000</div>
       <div class="acct-pnl" id="sys-pnl">+¥0 (0.00%)</div>
+      <div style="font-size:10px;color:var(--dim);margin-top:2px" id="sys-cash">¥60,000 cash</div>
       <div class="acct-stats">
         <div class="stat-box"><div class="stat-label">WIN RATE</div><div class="stat-val" id="sys-wr">—</div></div>
         <div class="stat-box"><div class="stat-label">TRADES</div><div class="stat-val" id="sys-trades">0</div></div>
@@ -144,6 +145,7 @@
       <div class="acct-name">YOUR ACCOUNT</div>
       <div class="acct-val" id="you-val">¥60,000</div>
       <div class="acct-pnl" id="you-pnl">+¥0 (0.00%)</div>
+      <div style="font-size:10px;color:var(--dim);margin-top:2px" id="you-cash">¥60,000 cash</div>
       <div class="acct-stats">
         <div class="stat-box"><div class="stat-label">WIN RATE</div><div class="stat-val" id="you-wr">—</div></div>
         <div class="stat-box"><div class="stat-label">TRADES</div><div class="stat-val" id="you-trades">0</div></div>
@@ -396,16 +398,47 @@ async function fetchAllPrices() {
 // ── Account stats ─────────────────────────────────────────────────────
 function calcAccount(filterFn) {
   const myTrades = trades.filter(filterFn);
+  const open = myTrades.filter(t => t.status === 'open');
   const closed = myTrades.filter(t => t.status !== 'open');
   const wins = closed.filter(t => t.status === 'target_hit');
   const losses = closed.filter(t => t.status === 'stopped_out');
-  const totalPnlPct = closed.reduce((sum, t) => sum + (t.result_pct || 0), 0);
-  const currentUSD = STARTING_USD * (1 + totalPnlPct / 100);
-  const currentJPY = Math.round(currentUSD * USD_JPY);
-  const pnlJPY = currentJPY - STARTING_JPY;
-  const pnlPct = (totalPnlPct).toFixed(2);
+
+  // Position size per trade: risk 5% of account / sl%
+  const RISK_PCT = 0.05;
+  function positionUSD(t) {
+    const riskUSD = STARTING_USD * RISK_PCT;
+    return riskUSD / (Math.abs(t.sl_pct) / 100);
+  }
+
+  // Cash = starting - invested in open trades + realized P&L from closed
+  let investedUSD = 0;
+  open.forEach(t => { investedUSD += positionUSD(t); });
+
+  let realizedPnlUSD = 0;
+  closed.forEach(t => {
+    const pos = positionUSD(t);
+    realizedPnlUSD += pos * (t.result_pct / 100);
+  });
+
+  // Unrealized P&L from open trades using live prices
+  let unrealizedPnlUSD = 0;
+  open.forEach(t => {
+    const price = prices[t.ticker];
+    if (price) {
+      const pct = (price - t.entry_price) / t.entry_price * 100;
+      unrealizedPnlUSD += positionUSD(t) * (pct / 100);
+    }
+  });
+
+  const cashUSD = STARTING_USD - investedUSD + realizedPnlUSD;
+  const totalUSD = cashUSD + investedUSD + unrealizedPnlUSD;
+  const cashJPY = Math.round(cashUSD * USD_JPY);
+  const totalJPY = Math.round(totalUSD * USD_JPY);
+  const pnlJPY = totalJPY - STARTING_JPY;
+  const pnlPct = ((totalUSD - STARTING_USD) / STARTING_USD * 100).toFixed(2);
   const wr = closed.length ? Math.round(wins.length / closed.length * 100) : null;
-  return { currentJPY, pnlJPY, pnlPct, wins: wins.length, losses: losses.length, total: myTrades.length, wr, closed, trades: myTrades };
+
+  return { cashJPY, totalJPY, pnlJPY, pnlPct, wins: wins.length, losses: losses.length, total: myTrades.length, wr, trades: myTrades };
 }
 
 function updateSidebar() {
@@ -414,10 +447,11 @@ function updateSidebar() {
 
   function renderAcct(prefix, stats) {
     const pnlSign = stats.pnlJPY >= 0 ? '+' : '';
-    document.getElementById(prefix+'-val').textContent = `¥${stats.currentJPY.toLocaleString()}`;
+    document.getElementById(prefix+'-val').textContent = `¥${stats.totalJPY.toLocaleString()}`;
     const pnlEl = document.getElementById(prefix+'-pnl');
     pnlEl.textContent = `${pnlSign}¥${stats.pnlJPY.toLocaleString()} (${pnlSign}${stats.pnlPct}%)`;
     pnlEl.className = 'acct-pnl ' + (stats.pnlJPY >= 0 ? 'up' : 'dn');
+    document.getElementById(prefix+'-cash').textContent = `¥${stats.cashJPY.toLocaleString()} cash`;
     document.getElementById(prefix+'-wr').textContent = stats.wr !== null ? stats.wr + '%' : '—';
     document.getElementById(prefix+'-trades').textContent = stats.total;
     document.getElementById(prefix+'-wins').textContent = stats.wins;
