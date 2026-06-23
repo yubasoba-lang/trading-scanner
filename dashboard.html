@@ -300,6 +300,12 @@ async function loadCandles(ticker, resolution) {
     volumeSeries.setData(vols);
     drawTradeLevels(ticker);
     chart.timeScale().fitContent();
+    // Scroll to show last 60 candles by default
+    const visibleCandles = Math.min(60, candles.length);
+    chart.timeScale().setVisibleRange({
+      from: candles[candles.length - visibleCandles].time,
+      to: candles[candles.length - 1].time,
+    });
 
     const last = candles[candles.length - 1];
     const prev = candles[candles.length - 2];
