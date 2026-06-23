@@ -1,0 +1,32 @@
+name: Daily Trading Scan
+
+on:
+  schedule:
+    - cron: '0 5 * * 1-5'  # 7am Budapest time (UTC+2), Monday–Friday
+  workflow_dispatch:         # also allows manual trigger from GitHub UI
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance ta anthropic requests
+
+      - name: Inject secrets into config
+        run: |
+          sed -i "s|FINNHUB_API_KEY = .*|FINNHUB_API_KEY = \"${{ secrets.FINNHUB_API_KEY }}\"|" config.py
+          sed -i "s|CLAUDE_API_KEY = .*|CLAUDE_API_KEY = \"${{ secrets.CLAUDE_API_KEY }}\"|" config.py
+          sed -i "s|EMAIL_PASSWORD = .*|EMAIL_PASSWORD = \"${{ secrets.EMAIL_PASSWORD }}\"|" config.py
+          sed -i "s|EMAIL_SENDER = .*|EMAIL_SENDER = \"${{ secrets.EMAIL_SENDER }}\"|" config.py
+          sed -i "s|EMAIL_RECEIVER = .*|EMAIL_RECEIVER = \"${{ secrets.EMAIL_RECEIVER }}\"|" config.py
+
+      - name: Run scanner
+        run: python scanner.py
