@@ -506,6 +506,19 @@ function renderSignals() {
         <div class="dec-btn skip ${dec==='Skip'?'active':''}" onclick="setDec(${t.id},'Skip',this)">Skip</div>
         <div class="dec-btn watch ${dec==='Watch'?'active':''}" onclick="setDec(${t.id},'Watch',this)">Watch</div>
       </div>
+      <div id="amount-row-${t.id}" style="display:${dec==='Buy'?'block':'none'};margin-top:8px">
+        <div style="font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:4px">INVEST AMOUNT</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="color:var(--dim);font-size:12px">$</span>
+          <input type="number" id="amount-input-${t.id}"
+            value="${decisions[t.id]?.amount || Math.round(Math.min(STARTING_USD*0.05/(Math.abs(t.sl_pct)/100), STARTING_USD*0.20))}"
+            min="1" step="1"
+            oninput="updateAmountInfo(${t.id}, ${t.sl_pct}, ${t.tp_pct})"
+            style="background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:13px;font-weight:600;width:80px">
+          <span id="amount-jpy-${t.id}" style="font-size:11px;color:var(--dim)"></span>
+        </div>
+        <div id="amount-info-${t.id}" style="font-size:10px;color:var(--dim);margin-top:4px"></div>
+      </div>
     </div>`;
   }).join('');
 }
@@ -516,6 +529,29 @@ function setDec(id, decision, btn) {
   btn.classList.add('active');
   if (!decisions[id]) decisions[id] = {};
   decisions[id].decision = decision;
+  const row = document.getElementById('amount-row-' + id);
+  if (row) {
+    row.style.display = decision === 'Buy' ? 'block' : 'none';
+    if (decision === 'Buy') {
+      const t = trades.find(t => String(t.id) === String(id));
+      if (t) updateAmountInfo(id, t.sl_pct, t.tp_pct);
+    }
+  }
+}
+
+function updateAmountInfo(id, sl_pct, tp_pct) {
+  const input = document.getElementById('amount-input-' + id);
+  const jpyEl = document.getElementById('amount-jpy-' + id);
+  const infoEl = document.getElementById('amount-info-' + id);
+  if (!input) return;
+  const usd = parseFloat(input.value) || 0;
+  const jpy = Math.round(usd * USD_JPY);
+  const maxLoss = (usd * Math.abs(sl_pct) / 100).toFixed(2);
+  const maxGain = (usd * tp_pct / 100).toFixed(2);
+  if (jpyEl) jpyEl.textContent = `~¥${jpy.toLocaleString()}`;
+  if (infoEl) infoEl.textContent = `Max loss -$${maxLoss} · Max gain +$${maxGain}`;
+  if (!decisions[id]) decisions[id] = {};
+  decisions[id].amount = usd;
 }
 
 function saveDecisions() {
