@@ -274,8 +274,9 @@ async function loadCandles(ticker, resolution) {
   const range = rangeMap[resolution];
   const interval = intervalMap[resolution];
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=${range}&interval=${interval}&includePrePost=false`;
-    const res = await fetch(url);
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=${range}&interval=${interval}&includePrePost=false`;
+    const proxy = `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`;
+    const res = await fetch(proxy);
     const json = await res.json();
     const result = json.chart.result[0];
     const timestamps = result.timestamp;
