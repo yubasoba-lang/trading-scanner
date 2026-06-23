@@ -23,15 +23,13 @@ jobs:
       - name: Install dependencies
         run: pip install yfinance ta anthropic requests
 
-      - name: Inject secrets into config
-        run: |
-          sed -i "s|FINNHUB_API_KEY = .*|FINNHUB_API_KEY = \"${{ secrets.FINNHUB_API_KEY }}\"|" config.py
-          sed -i "s|CLAUDE_API_KEY = .*|CLAUDE_API_KEY = \"${{ secrets.CLAUDE_API_KEY }}\"|" config.py
-          sed -i "s|EMAIL_PASSWORD = .*|EMAIL_PASSWORD = \"${{ secrets.EMAIL_PASSWORD }}\"|" config.py
-          sed -i "s|EMAIL_SENDER = .*|EMAIL_SENDER = \"${{ secrets.EMAIL_SENDER }}\"|" config.py
-          sed -i "s|EMAIL_RECEIVER = .*|EMAIL_RECEIVER = \"${{ secrets.EMAIL_RECEIVER }}\"|" config.py
-
       - name: Run scanner
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
         run: python scanner.py
 
       - name: Commit updated trade log

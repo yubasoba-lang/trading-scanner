@@ -9,18 +9,17 @@ USD_JPY_RATE = 155  # update this manually if rate changes significantly
 # Rule: never risk more than this % of your account on one trade
 RISK_PER_TRADE_PCT = 5  # 5% of account per trade = ~¥3,000 = ~$20
 
-# Dashboard URL (update this once hosted publicly)
-DASHBOARD_URL = "http://localhost:8766/dashboard.html"
+# Dashboard URL
+DASHBOARD_URL = "https://yubasoba-lang.github.io/trading-scanner/dashboard.html"
 
 # Probability score thresholds
 BUY_THRESHOLD = 65    # score >= this → potential buy signal
 SELL_THRESHOLD = 35   # score <= this → potential sell / avoid signal
 
-# Finnhub API key (free at finnhub.io — no credit card needed)
-FINNHUB_API_KEY = "d8tb609r01qhcnk1e3v0d8tb609r01qhcnk1e3vg"
-CLAUDE_API_KEY = "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"
-
-# Email alerts
-EMAIL_SENDER = "yuva.y.ajeesh@gmail.com"
-EMAIL_PASSWORD = "rdkl nytt rjmf ycdj"
-EMAIL_RECEIVER = "yuva.y.ajeesh@gmail.com"
+# Keys injected by GitHub Actions secrets (or set locally via environment)
+import os
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
+CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+EMAIL_RECEIVER = os.environ.get("EMAIL_RECEIVER", "")
