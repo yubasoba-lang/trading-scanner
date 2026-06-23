@@ -317,15 +317,16 @@ async function loadCandles(ticker, resolution) {
   }
 }
 
+let _priceLines = [];
 function drawTradeLevels(ticker) {
-  // Remove existing price lines
-  try { candleSeries.priceLines().forEach(l => candleSeries.removePriceLine(l)); } catch(e) {}
+  _priceLines.forEach(l => { try { candleSeries.removePriceLine(l); } catch(e) {} });
+  _priceLines = [];
   const open = trades.filter(t => t.ticker === ticker && t.status === 'open');
-  open.forEach(t => {
-    candleSeries.createPriceLine({ price: t.entry_price, color: '#58a6ff', lineWidth: 1, lineStyle: 2, title: 'Entry' });
-    candleSeries.createPriceLine({ price: t.sl, color: '#f85149', lineWidth: 1, lineStyle: 2, title: 'SL' });
-    candleSeries.createPriceLine({ price: t.tp, color: '#3fb950', lineWidth: 1, lineStyle: 2, title: 'TP' });
-  });
+  if (!open.length) return;
+  const t = open[0];
+  _priceLines.push(candleSeries.createPriceLine({ price: t.entry_price, color: '#58a6ff', lineWidth: 1, lineStyle: 2, title: 'Entry' }));
+  _priceLines.push(candleSeries.createPriceLine({ price: t.sl, color: '#f85149', lineWidth: 1, lineStyle: 2, title: 'SL' }));
+  _priceLines.push(candleSeries.createPriceLine({ price: t.tp, color: '#3fb950', lineWidth: 1, lineStyle: 2, title: 'TP' }));
 }
 
 function setRes(res, el) {
