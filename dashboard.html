@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Scanner</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --card: #1a1a1a;
+    --border: #2a2a2a;
+    --gold: #e0d0a8;
+    --green: #4caf79;
+    --red: #e05c5c;
+    --yellow: #e0b84c;
+    --text: #e8e8e8;
+    --dim: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; color: var(--gold); margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: var(--dim); margin-bottom: 20px; }
+  .section-title { font-size: 11px; color: var(--dim); letter-spacing: 1px; margin: 20px 0 8px; }
+
+  /* Signal card */
+  .signal-card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 10px; border: 1px solid var(--border); }
+  .signal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .ticker { font-size: 18px; font-weight: 700; color: var(--gold); }
+  .score-badge { font-size: 12px; background: #ffffff11; padding: 3px 8px; border-radius: 20px; }
+  .signal-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .signal-item label { font-size: 10px; color: var(--dim); display: block; }
+  .signal-item span { font-size: 13px; font-weight: 600; }
+  .sl { color: var(--red); }
+  .tp { color: var(--green); }
+
+  /* Decision */
+  .decision-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .dec-btn { flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--dim); font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .dec-btn.buy.active { background: #4caf7922; border-color: var(--green); color: var(--green); font-weight: 700; }
+  .dec-btn.skip.active { background: #e05c5c22; border-color: var(--red); color: var(--red); font-weight: 700; }
+  .dec-btn.watch.active { background: #e0b84c22; border-color: var(--yellow); color: var(--yellow); font-weight: 700; }
+  .dec-btn:hover { border-color: var(--gold); color: var(--gold); }
+  textarea { width: 100%; background: #111; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; padding: 10px; resize: none; height: 70px; font-family: inherit; }
+  textarea::placeholder { color: var(--dim); }
+
+  /* Trade history */
+  .trade-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .trade-row:last-child { border-bottom: none; }
+  .trade-ticker { font-weight: 700; font-size: 14px; }
+  .trade-meta { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .trade-result { font-weight: 700; font-size: 14px; }
+  .win { color: var(--green); }
+  .loss { color: var(--red); }
+  .open-badge { color: var(--yellow); font-size: 12px; }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+  .stat-box { background: var(--card); border-radius: 10px; padding: 10px; text-align: center; }
+  .stat-val { font-size: 20px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: var(--dim); margin-top: 2px; }
+
+  /* Save button */
+  .save-btn { width: 100%; padding: 14px; background: var(--gold); color: #000; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .save-btn:hover { opacity: 0.9; }
+  .saved-msg { text-align: center; color: var(--green); font-size: 13px; margin-top: 8px; display: none; }
+
+  .balance-bar { background: var(--card); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .balance-label { font-size: 11px; color: var(--dim); }
+  .balance-val { font-size: 20px; font-weight: 700; }
+  .empty { color: var(--dim); font-size: 13px; padding: 12px 0; }
+  .card { background: var(--card); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
+  .decision-chip { font-size: 11px; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-top: 2px; }
+  .chip-buy { background: #4caf7922; color: var(--green); }
+  .chip-skip { background: #e05c5c22; color: var(--red); }
+  .chip-watch { background: #e0b84c22; color: var(--yellow); }
+  .chip-none { background: #ffffff11; color: var(--dim); }
+</style>
+</head>
+<body>
+
+<h1>Trading Scanner</h1>
+<div class="subtitle" id="last-run">Loading...</div>
+
+<div class="balance-bar" id="balance-bar"></div>
+<div class="stats-grid" id="stats"></div>
+
+<div class="section-title">TODAY'S SIGNALS — LOG YOUR DECISION</div>
+<div id="signals-container"><div class="empty">No signals today yet. Run the scanner first.</div></div>
+<button class="save-btn" id="save-btn" style="display:none" onclick="saveDecisions()">Save My Decisions</button>
+<div class="saved-msg" id="saved-msg">✓ Decisions saved</div>
+
+<div class="section-title">OPEN TRADES</div>
+<div class="card" id="open-trades"></div>
+
+<div class="section-title">HISTORY</div>
+<div class="card" id="history"></div>
+
+<script>
+const FILE_PATH = 'paper_trades.json';
+const STARTING_BALANCE_JPY = 60000;
+const USD_JPY = 155; // approximate rate, update manually
+const STARTING_BALANCE_USD = STARTING_BALANCE_JPY / USD_JPY;
+let trades = [];
+let todaySignals = [];
+let decisions = {};
+
+async function loadTrades() {
+  try {
+    const res = await fetch(FILE_PATH + '?t=' + Date.now());
+    trades = await res.json();
+  } catch(e) {
+    trades = [];
+  }
+}
+
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function renderBalance() {
+  const closed = trades.filter(t => t.status !== 'open');
+  const totalPnlPct = closed.reduce((s, t) => s + (t.result_pct || 0), 0);
+  const currentUSD = STARTING_BALANCE_USD * (1 + totalPnlPct / 100);
+  const currentJPY = Math.round(currentUSD * USD_JPY);
+  const pnlJPY = currentJPY - STARTING_BALANCE_JPY;
+  const positive = pnlJPY >= 0;
+
+  document.getElementById('balance-bar').innerHTML = `
+    <div>
+      <div class="balance-label">PAPER BALANCE</div>
+      <div class="balance-val" style="color:var(--gold)">¥${currentJPY.toLocaleString()}</div>
+    </div>
+    <div style="text-align:right">
+      <div class="balance-label">vs ¥60,000 start</div>
+      <div style="font-size:16px;font-weight:700;color:${positive ? 'var(--green)' : 'var(--red)'}">
+        ${positive ? '+' : ''}¥${pnlJPY.toLocaleString()}
+      </div>
+    </div>`;
+}
+
+function renderStats() {
+  const closed = trades.filter(t => t.status !== 'open');
+  const wins = closed.filter(t => t.status === 'target_hit');
+  const losses = closed.filter(t => t.status === 'stopped_out');
+  const totalPnl = closed.reduce((s, t) => s + (t.result_pct || 0), 0);
+  const wr = closed.length ? Math.round(wins.length / closed.length * 100) : 0;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-box">
+      <div class="stat-val" style="color:${totalPnl >= 0 ? 'var(--green)' : 'var(--red)'}">${totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(1)}%</div>
+      <div class="stat-label">System P&L</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:var(--gold)">${wr}%</div>
+      <div class="stat-label">Win Rate</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:var(--green)">${wins.length}</div>
+      <div class="stat-label">Wins</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:var(--red)">${losses.length}</div>
+      <div class="stat-label">Losses</div>
+    </div>`;
+}
+
+function renderTodaySignals() {
+  const t = today();
+  todaySignals = trades.filter(tr => tr.date === t);
+
+  if (!todaySignals.length) {
+    document.getElementById('signals-container').innerHTML = '<div class="empty">No signals today yet. Run the scanner first.</div>';
+    document.getElementById('save-btn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('save-btn').style.display = 'block';
+  document.getElementById('signals-container').innerHTML = todaySignals.map(tr => `
+    <div class="signal-card">
+      <div class="signal-header">
+        <span class="ticker">${tr.ticker}</span>
+        <span class="score-badge">Score ${tr.score}/100</span>
+      </div>
+      <div class="signal-grid">
+        <div class="signal-item"><label>Price</label><span>$${tr.entry_price}</span></div>
+        <div class="signal-item"><label>Stop Loss</label><span class="sl">$${tr.sl} (${tr.sl_pct}%)</span></div>
+        <div class="signal-item"><label>Take Profit</label><span class="tp">$${tr.tp} (+${tr.tp_pct}%)</span></div>
+        <div class="signal-item"><label>ATR</label><span>${tr.atr_pct}% daily</span></div>
+        <div class="signal-item"><label>R/R Ratio</label><span>1:${(tr.tp_pct / Math.abs(tr.sl_pct)).toFixed(1)}</span></div>
+        ${tr.earnings_warning ? '<div class="signal-item"><label>⚠️ Earnings</label><span style="color:var(--yellow)">Within 7 days</span></div>' : ''}
+      </div>
+      <div class="decision-row">
+        <button class="dec-btn buy" onclick="setDecision('${tr.id}', 'Buy', this)">Buy</button>
+        <button class="dec-btn skip" onclick="setDecision('${tr.id}', 'Skip', this)">Skip</button>
+        <button class="dec-btn watch" onclick="setDecision('${tr.id}', 'Watch', this)">Watch</button>
+      </div>
+      <div id="amount-row-${tr.id}" style="display:none;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--dim);margin-bottom:6px;letter-spacing:1px">HOW MUCH TO INVEST</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" min="10" max="${Math.round(STARTING_BALANCE_JPY/USD_JPY/2)}" value="${Math.round(STARTING_BALANCE_JPY/USD_JPY*0.05)}" step="5"
+            id="amount-${tr.id}"
+            oninput="updateAmount('${tr.id}', ${tr.entry_price}, ${tr.sl_pct}, ${tr.tp_pct})"
+            style="flex:1;accent-color:var(--gold)">
+          <span id="amount-label-${tr.id}" style="font-size:13px;font-weight:700;min-width:80px;text-align:right"></span>
+        </div>
+        <div id="amount-detail-${tr.id}" style="font-size:12px;color:var(--dim);margin-top:6px"></div>
+      </div>
+      <textarea id="notes-${tr.id}" placeholder="Why are you making this decision? (optional but builds your judgment)"></textarea>
+    </div>`).join('');
+}
+
+function setDecision(id, decision, btn) {
+  const card = btn.closest('.signal-card');
+  card.querySelectorAll('.dec-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  decisions[id] = decision;
+  const amountRow = document.getElementById('amount-row-' + id);
+  if (amountRow) {
+    amountRow.style.display = decision === 'Buy' ? 'block' : 'none';
+    if (decision === 'Buy') {
+      const tr = todaySignals.find(t => String(t.id) === String(id));
+      if (tr) updateAmount(id, tr.entry_price, tr.sl_pct, tr.tp_pct);
+    }
+  }
+}
+
+function updateAmount(id, price, sl_pct, tp_pct) {
+  const input = document.getElementById('amount-' + id);
+  const label = document.getElementById('amount-label-' + id);
+  const detail = document.getElementById('amount-detail-' + id);
+  if (!input || !label || !detail) return;
+  const usd = parseFloat(input.value);
+  const jpy = Math.round(usd * USD_JPY);
+  const shares = (usd / price).toFixed(4);
+  const maxLoss = (usd * Math.abs(sl_pct) / 100).toFixed(2);
+  const maxGain = (usd * tp_pct / 100).toFixed(2);
+  label.textContent = '$' + usd + ' (~¥' + jpy.toLocaleString() + ')';
+  detail.textContent = shares + ' shares · Max loss $' + maxLoss + ' · Max gain $' + maxGain;
+  decisions['amount_' + id] = usd;
+}
+
+function saveDecisions() {
+  todaySignals.forEach(tr => {
+    const decision = decisions[tr.id];
+    const notes = document.getElementById('notes-' + tr.id)?.value || '';
+    const amount = decisions['amount_' + tr.id] || null;
+    if (decision || notes) {
+      tr.your_decision = decision || null;
+      tr.your_notes = notes;
+      tr.your_amount_usd = decision === 'Buy' ? amount : null;
+    }
+  });
+
+  const blob = new Blob([JSON.stringify(trades, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'paper_trades.json';
+  a.click();
+
+  document.getElementById('saved-msg').style.display = 'block';
+  setTimeout(() => document.getElementById('saved-msg').style.display = 'none', 3000);
+}
+
+function renderOpenTrades() {
+  const open = trades.filter(t => t.status === 'open');
+  const el = document.getElementById('open-trades');
+  if (!open.length) { el.innerHTML = '<div class="empty">No open trades.</div>'; return; }
+  el.innerHTML = open.map(t => `
+    <div class="trade-row">
+      <div>
+        <div class="trade-ticker">${t.ticker}</div>
+        <div class="trade-meta">Entry $${t.entry_price} · SL $${t.sl} · TP $${t.tp}</div>
+        <div class="trade-meta">Since ${t.date}</div>
+        ${t.your_decision ? `<span class="decision-chip chip-${t.your_decision.toLowerCase()}">${t.your_decision}</span>` : '<span class="decision-chip chip-none">No decision logged</span>'}
+      </div>
+      <span class="open-badge">OPEN</span>
+    </div>`).join('');
+}
+
+function renderHistory() {
+  const closed = trades.filter(t => t.status !== 'open').slice(-15).reverse();
+  const el = document.getElementById('history');
+  if (!closed.length) { el.innerHTML = '<div class="empty">No closed trades yet.</div>'; return; }
+  el.innerHTML = closed.map(t => {
+    const win = t.status === 'target_hit';
+    const pct = t.result_pct || 0;
+    return `<div class="trade-row">
+      <div>
+        <div class="trade-ticker">${t.ticker}</div>
+        <div class="trade-meta">${t.date} → ${t.exit_date || '?'}</div>
+        ${t.your_decision ? `<span class="decision-chip chip-${t.your_decision.toLowerCase()}">${t.your_decision}</span>` : ''}
+        ${t.your_notes ? `<div class="trade-meta" style="margin-top:4px;font-style:italic">"${t.your_notes.slice(0,60)}${t.your_notes.length > 60 ? '...' : ''}"</div>` : ''}
+      </div>
+      <div class="trade-result ${win ? 'win' : 'loss'}">${win ? '+' : ''}${pct.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+async function init() {
+  document.getElementById('last-run').textContent = 'Last updated: ' + new Date().toLocaleDateString('en', {weekday:'long', month:'short', day:'numeric'});
+  await loadTrades();
+  renderBalance();
+  renderStats();
+  renderTodaySignals();
+  renderOpenTrades();
+  renderHistory();
+}
+
+init();
+</script>
+</body>
+</html>

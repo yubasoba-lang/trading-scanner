@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "date": "2026-06-23",
+    "ticker": "NVDA",
+    "entry_price": 202.3,
+    "score": 67,
+    "bias": "BULLISH",
+    "sl": 190.97,
+    "tp": 221.32,
+    "sl_pct": -5.6,
+    "tp_pct": 9.4,
+    "atr_pct": 3.75,
+    "earnings_warning": false,
+    "status": "open",
+    "exit_price": null,
+    "exit_date": null,
+    "result_pct": null
+  },
+  {
+    "id": 2,
+    "date": "2026-06-23",
+    "ticker": "TSLA",
+    "entry_price": 384.62,
+    "score": 67,
+    "bias": "BULLISH",
+    "sl": 358.47,
+    "tp": 428.47,
+    "sl_pct": -6.8,
+    "tp_pct": 11.4,
+    "atr_pct": 4.55,
+    "earnings_warning": false,
+    "status": "open",
+    "exit_price": null,
+    "exit_date": null,
+    "result_pct": null
+  }
+]
