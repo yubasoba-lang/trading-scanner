@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": 1782318632505,
+    "ref_id": 1,
+    "date": "2026-06-24",
+    "ticker": "NVDA",
+    "entry_price": 202.3,
+    "sl": 190.97,
+    "tp": 221.32,
+    "sl_pct": -5.6,
+    "tp_pct": 9.4,
+    "atr_pct": 3.75,
+    "position_usd": 77,
+    "status": "open",
+    "exit_price": null,
+    "exit_date": null,
+    "result_pct": null
+  }
+]
