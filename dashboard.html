@@ -460,6 +460,8 @@ async function fetchAllPrices() {
   }));
 }
 
+function round2(n) { return Math.round(n * 100) / 100; }
+
 // ── Account calc ──────────────────────────────────────────────────────
 function calcAcct(trades) {
   const open = trades.filter(t=>t.status==='open');
@@ -548,7 +550,7 @@ function renderSignals() {
                <span class="amount-jpy" id="buy-jpy-${t.id}"></span>
              </div>
              <div class="amount-info" id="buy-info-${t.id}"></div>
-             <div class="confirm-btn" onclick="confirmBuy(${t.id},'${t.ticker}',${t.entry_price},${t.sl},${t.tp},${t.sl_pct},${t.tp_pct},${t.atr_pct})">Confirm Buy</div>
+             <div class="confirm-btn" onclick="confirmBuy(${t.id},'${t.ticker}',${t.entry_price},${t.sl},${t.tp},${t.sl_pct},${t.tp_pct},${t.atr_pct},${t.score})">Confirm Buy</div>
            </div>`
       }
     </div>`;
@@ -588,15 +590,20 @@ function updateBuyInfo(id, sl_pct, tp_pct) {
   if(infoEl) infoEl.textContent = `Max loss -$${(usd*Math.abs(sl_pct)/100).toFixed(2)} · Max gain +$${(usd*tp_pct/100).toFixed(2)}`;
 }
 
-async function confirmBuy(refId, ticker, entry, sl, tp, sl_pct, tp_pct, atr_pct) {
+async function confirmBuy(refId, ticker, entry, sl, tp, sl_pct, tp_pct, atr_pct, score) {
   const input = document.getElementById('buy-amt-'+refId);
   const usd = parseFloat(input?.value)||0;
   if (usd <= 0) { alert('Enter an amount'); return; }
+  // Use current market price, not system's entry price
+  const currentPrice = prices[ticker] || entry;
+  // Recalculate SL/TP from current price using same ATR percentages
+  const slPrice = round2(currentPrice * (1 + sl_pct / 100));
+  const tpPrice = round2(currentPrice * (1 + tp_pct / 100));
   const trade = {
     id: Date.now(),
     ref_id: refId,
     date: new Date().toISOString().slice(0,10),
-    ticker, entry_price: entry, sl, tp, sl_pct, tp_pct, atr_pct,
+    ticker, entry_price: currentPrice, sl: slPrice, tp: tpPrice, sl_pct, tp_pct, atr_pct, score,
     position_usd: usd,
     status: 'open',
     exit_price: null, exit_date: null, result_pct: null
@@ -717,7 +724,7 @@ function renderSysOpen(el) {
 function renderYouOpen(el) {
   const open = myTrades.filter(t=>t.status==='open');
   if (!open.length) { el.innerHTML='<div class="empty">No open trades in your account. Buy from Signals panel →</div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>TICKER</th><th>DATE</th><th>ENTRY</th><th>INVESTED</th><th>SL</th><th>TP</th><th>NOW</th><th>ACTION</th></tr></thead><tbody>
+  el.innerHTML = `<table><thead><tr><th>TICKER</th><th>DATE</th><th>ENTRY</th><th>INVESTED</th><th>SL</th><th>TP</th><th>ATR%</th><th>SCORE</th><th>NOW</th><th>ACTION</th></tr></thead><tbody>
   ${open.map(t => {
     const price = prices[t.ticker];
     const unr = price ? ((price-t.entry_price)/t.entry_price*100).toFixed(1) : '—';
@@ -726,6 +733,7 @@ function renderYouOpen(el) {
       <td><b>${t.ticker}</b></td><td>${t.date}</td><td>$${t.entry_price}</td>
       <td>$${t.position_usd} (~¥${Math.round(t.position_usd*USD_JPY).toLocaleString()})</td>
       <td class="dn">$${t.sl}</td><td class="up">$${t.tp}</td>
+      <td>${t.atr_pct??'—'}%</td><td>${t.score??'—'}/100</td>
       <td class="${cls}">${price?'$'+price.toFixed(2)+' ('+unr+'%)':'—'}</td>
       <td><div class="sell-btn" onclick="sellTrade(${t.id})">Sell</div></td>
     </tr>`;
