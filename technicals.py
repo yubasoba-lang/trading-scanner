@@ -48,42 +48,48 @@ def compute_signals(df: pd.DataFrame) -> dict:
 def probability_score(signals: dict) -> int:
     """
     Returns a 0-100 score. Above 65 = bullish bias, below 35 = bearish bias.
-    This is a technical probability score, not a guarantee.
+    MACD acts as a momentum veto: bearish crossover hard-caps score at 55 (no buy),
+    bullish crossover hard-floors score at 45 (no sell). This prevents EMA/RSI
+    from dragging a conflicted setup into a buy signal.
     """
     score = 50  # neutral baseline
 
     # RSI: oversold = bullish setup, overbought = bearish
     rsi = signals["rsi"]
     if rsi < 30:
-        score += 15   # oversold, mean reversion opportunity
+        score += 15
     elif rsi < 45:
         score += 7
     elif rsi > 70:
-        score -= 15  # overbought
+        score -= 15
     elif rsi > 55:
         score -= 5
-
-    # MACD
-    if signals["macd_bullish"]:
-        score += 10
-    else:
-        score -= 10
 
     # Bollinger Band position
     bb_pos = signals["bb_position"]
     if bb_pos < 20:
-        score += 10   # near lower band, potential bounce
-    elif bb_pos > 80:
-        score -= 10  # near upper band, potential pullback
-
-    # EMA trend
-    if signals["ema_trend"] == "bullish":
         score += 10
-    else:
+    elif bb_pos > 80:
         score -= 10
+
+    # EMA trend (lagging — weighted less than momentum)
+    if signals["ema_trend"] == "bullish":
+        score += 7
+    else:
+        score -= 7
 
     # Volume confirmation
     if signals["volume_ratio"] > 1.5 and signals["macd_bullish"]:
-        score += 5   # high volume on bullish day = stronger signal
+        score += 5
 
-    return max(0, min(100, score))
+    score = max(0, min(100, score))
+
+    # MACD veto gate: momentum overrides trend alignment
+    # Bearish crossover → cap at 55 (below buy threshold of 65)
+    # Bullish crossover → floor at 45 (above sell threshold of 35)
+    if not signals["macd_bullish"]:
+        score = min(score, 55)
+    else:
+        score = max(score, 45)
+
+    return score

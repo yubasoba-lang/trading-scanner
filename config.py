@@ -1,5 +1,20 @@
 # Tickers you want to watch
-WATCHLIST = ["AAPL", "NVDA", "TSLA", "MSFT", "SPY", "META", "AMZN", "MRNA"]
+WATCHLIST = [
+    # Mega-cap tech
+    "AAPL", "NVDA", "TSLA", "MSFT", "META", "AMZN", "GOOGL",
+    # Semiconductors
+    "AMD", "AVGO", "TSM",
+    # Finance
+    "JPM", "V",
+    # Healthcare / biotech
+    "MRNA", "LLY", "UNH",
+    # Energy
+    "XOM",
+    # Consumer / retail
+    "COST", "WMT",
+    # Broad market ETFs
+    "SPY", "QQQ",
+]
 
 # Starting balance in JPY for paper trading simulation
 STARTING_BALANCE_JPY = 60000
