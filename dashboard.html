@@ -512,67 +512,103 @@ function renderRPanel() {
   else renderYourOpenTrades();
 }
 
+function scoreColor(score) {
+  if (score >= 65) return '#3fb950';
+  if (score >= 55) return '#d4a843';
+  if (score <= 35) return '#f85149';
+  return 'var(--dim)';
+}
+
 function renderSignals() {
   const el = document.getElementById('right-content');
-  const signals = sysTrades.filter(t=>t.status==='open');
 
-  // Bearish tickers from today's daily scores
-  const bearish = dailyScores.filter(r=>r.bias==='BEARISH');
+  // Build a map of open system trades by ticker for buy buttons
+  const openByTicker = {};
+  sysTrades.filter(t=>t.status==='open').forEach(t => openByTicker[t.ticker] = t);
 
-  const bullishHtml = signals.length ? signals.map(t => {
-    const alreadyBought = myTrades.some(m=>m.ref_id===t.id&&m.status==='open');
-    const defaultAmt = Math.round(Math.min(STARTING_USD*0.05/(Math.abs(t.sl_pct)/100), STARTING_USD*0.20));
+  // All tickers scored today, sorted by score desc
+  const scored = [...dailyScores].sort((a,b) => b.score - a.score);
+
+  // Tickers with no score yet (not in today's scan)
+  const scoredTickers = new Set(scored.map(r=>r.ticker));
+  const unscored = WATCHLIST.filter(t=>!scoredTickers.has(t));
+
+  if (!scored.length && !unscored.length) {
+    el.innerHTML = '<div class="empty">No scan data yet — scores appear after the daily scan runs</div>';
+    return;
+  }
+
+  const rows = scored.map(r => {
+    const sysOpen = openByTicker[r.ticker];
+    const alreadyBought = myTrades.some(m => m.ticker===r.ticker && m.status==='open');
+    const price = prices[r.ticker];
+    const atr_pct = r.atr_pct || 2.0;
+    const sl_pct = round2(-(atr_pct * 1.5));
+    const tp_pct = round2(atr_pct * 2.5);
+    const entryPrice = price || 0;
+    const sl = round2(entryPrice * (1 + sl_pct/100));
+    const tp = round2(entryPrice * (1 + tp_pct/100));
+    const defaultAmt = Math.round(Math.min(STARTING_USD*0.05/(Math.abs(sl_pct)/100), STARTING_USD*0.20));
+    const macdColor = r.macd_bullish ? '#3fb950' : '#f85149';
+    const macdLabel = r.macd_bullish ? 'MACD ↑' : 'MACD ↓';
+    const uid = `ds-${r.ticker}`;
+
+    const buySection = alreadyBought
+      ? `<div class="buy-btn bought">Already in your trades</div>`
+      : `<div class="buy-btn" onclick="showBuyForm('${uid}')">Buy in Your Account</div>
+         <div class="amount-row" id="buy-form-${uid}">
+           <div class="amount-label">INVEST AMOUNT</div>
+           <div class="amount-input-row">
+             <span style="color:var(--dim)">$</span>
+             <input class="amount-input" type="number" id="buy-amt-${uid}" value="${defaultAmt}" min="1" step="1"
+               oninput="updateBuyInfo('${uid}',${sl_pct},${tp_pct})">
+             <span class="amount-jpy" id="buy-jpy-${uid}"></span>
+           </div>
+           <div class="amount-info" id="buy-info-${uid}"></div>
+           <div class="confirm-btn" onclick="confirmBuyTicker('${uid}','${r.ticker}',${sl_pct},${tp_pct},${atr_pct},${r.score})">Confirm Buy</div>
+         </div>`;
+
     return `<div class="signal-card">
       <div class="sig-top">
-        <div class="sig-ticker" onclick="selectTicker('${t.ticker}')">${t.ticker}</div>
-        <div class="sig-score">${t.score}/100</div>
+        <div class="sig-ticker" onclick="selectTicker('${r.ticker}')">${r.ticker}</div>
+        <div class="sig-score" style="color:${scoreColor(r.score)};background:${r.score>=65?'#1a3a2a':r.score<=35?'#3a1a1a':'#2a2a1a'}">${r.score}/100</div>
       </div>
-      <div class="levels">
-        <div class="lev"><div class="lev-label">ENTRY</div><div class="lev-val">$${t.entry_price}</div></div>
-        <div class="lev"><div class="lev-label">SL</div><div class="lev-val dn">$${t.sl}</div></div>
-        <div class="lev"><div class="lev-label">TP</div><div class="lev-val up">$${t.tp}</div></div>
+      <div class="sig-meta" style="margin:4px 0">
+        <span style="color:${macdColor};font-weight:600">${macdLabel}</span>
+        · RSI ${r.rsi} · ATR ${atr_pct}%
+        ${sysOpen ? `<span style="color:var(--dim)"> · System holding</span>` : ''}
       </div>
-      <div class="sig-meta">
-        <span style="color:${t.macd_bullish===false?'#f85149':'#3fb950'};font-weight:600">
-          ${t.macd_bullish===false?'MACD ↓ Bearish':'MACD ↑ Bullish'}
-        </span>
-        · ATR ${t.atr_pct}% · R/R 1:${(t.tp_pct/Math.abs(t.sl_pct)).toFixed(1)}${t.earnings_warning?' · ⚠ Earnings':''}
-      </div>
-      ${alreadyBought
-        ? `<div class="buy-btn bought">Already in your trades</div>`
-        : `<div class="buy-btn" onclick="showBuyForm(${t.id})">Buy in Your Account</div>
-           <div class="amount-row" id="buy-form-${t.id}">
-             <div class="amount-label">INVEST AMOUNT</div>
-             <div class="amount-input-row">
-               <span style="color:var(--dim)">$</span>
-               <input class="amount-input" type="number" id="buy-amt-${t.id}" value="${defaultAmt}" min="1" step="1"
-                 oninput="updateBuyInfo(${t.id},${t.sl_pct},${t.tp_pct})">
-               <span class="amount-jpy" id="buy-jpy-${t.id}"></span>
-             </div>
-             <div class="amount-info" id="buy-info-${t.id}"></div>
-             <div class="confirm-btn" onclick="confirmBuy(${t.id},'${t.ticker}',${t.entry_price},${t.sl},${t.tp},${t.sl_pct},${t.tp_pct},${t.atr_pct},${t.score})">Confirm Buy</div>
-           </div>`
-      }
+      ${r.score >= 55 ? buySection : `<div style="font-size:11px;color:var(--dim);padding:4px 0">Score too low to buy</div>`}
     </div>`;
-  }).join('') : '<div class="empty">No bullish signals today</div>';
+  });
 
-  const bearishHtml = bearish.length ? `
-    <div style="margin:12px 0 8px;padding:8px 12px;border-top:1px solid var(--border2);font-size:10px;color:#f85149;letter-spacing:1px;font-weight:600">▼ BEARISH — AVOID OR EXIT</div>
-    ${bearish.map(r => `
-      <div class="signal-card" style="opacity:0.7">
-        <div class="sig-top">
-          <div class="sig-ticker" onclick="selectTicker('${r.ticker}')">${r.ticker}</div>
-          <div class="sig-score" style="background:#3a1a1a;color:#f85149">${r.score}/100</div>
-        </div>
-        <div class="sig-meta" style="margin-top:4px">
-          <span style="color:#f85149;font-weight:600">MACD ↓ Bearish</span>
-          · RSI ${r.rsi} · ATR ${r.atr_pct}%
-        </div>
-        <div style="font-size:11px;color:var(--dim);padding:4px 0">Avoid buying · exit if holding</div>
-      </div>`).join('')}` : '';
+  el.innerHTML = rows.join('') || '<div class="empty">No scan data yet</div>';
+  scored.forEach(r => updateBuyInfo(`ds-${r.ticker}`, round2(-(r.atr_pct*1.5)), round2(r.atr_pct*2.5)));
+}
 
-  el.innerHTML = bullishHtml + bearishHtml;
-  signals.forEach(t => updateBuyInfo(t.id, t.sl_pct, t.tp_pct));
+async function confirmBuyTicker(uid, ticker, sl_pct, tp_pct, atr_pct, score) {
+  const input = document.getElementById('buy-amt-'+uid);
+  const usd = parseFloat(input?.value)||0;
+  if (usd <= 0) { alert('Enter an amount'); return; }
+  const currentPrice = prices[ticker];
+  if (!currentPrice) { alert('Price not loaded yet'); return; }
+  const sl = round2(currentPrice * (1 + sl_pct/100));
+  const tp = round2(currentPrice * (1 + tp_pct/100));
+  const trade = {
+    id: Date.now(),
+    ref_id: null,
+    date: new Date().toISOString().slice(0,10),
+    ticker, entry_price: currentPrice, sl, tp, sl_pct, tp_pct, atr_pct, score,
+    position_usd: usd,
+    status: 'open',
+    exit_price: null, exit_date: null, result_pct: null
+  };
+  myTrades.push(trade);
+  const saved = await ghPut(YOU_FILE, myTrades, `Buy ${ticker} - your account`);
+  if (!saved && !pat) localStorage.setItem('my_trades_local', JSON.stringify(myTrades));
+  updateSidebar();
+  renderRPanel();
+  renderTab();
 }
 
 function showBuyForm(id) {
