@@ -294,7 +294,6 @@ function skipPAT() {
 async function init() {
   const btn = document.getElementById('gh-connect-btn');
   if (btn) btn.innerHTML = pat ? '✓ GitHub connected' : '🔗 Connect GitHub to sync trades';
-  buildWatchlist();
   initChart();
   await Promise.all([
     loadFile(SYS_FILE).then(d => sysTrades = d),
@@ -302,6 +301,7 @@ async function init() {
     loadDailyScores().then(d => dailyScores = d),
     fetchAllPrices()
   ]);
+  buildWatchlist();
   updateSidebar();
   renderRPanel();
   renderTab();
