@@ -1,8 +1,23 @@
 import json
 import os
 from datetime import datetime
+from config import STARTING_BALANCE_JPY, USD_JPY_RATE, RISK_PER_TRADE_PCT, MAX_OPEN_TRADES
 
 LOG_FILE = os.path.join(os.path.dirname(__file__), "paper_trades.json")
+
+
+def available_cash_usd(trades: list) -> float:
+    """Cash remaining after all open positions are accounted for."""
+    account_usd = STARTING_BALANCE_JPY / USD_JPY_RATE
+    risk_usd = account_usd * RISK_PER_TRADE_PCT / 100
+    invested = 0.0
+    for t in trades:
+        if t["status"] != "open":
+            continue
+        sl_pct = abs(t["sl_pct"])
+        position = min(risk_usd / (sl_pct / 100), account_usd * 0.20)
+        invested += position
+    return account_usd - invested
 
 
 def load_log():
@@ -23,11 +38,25 @@ SLIPPAGE_PCT = 0.001
 def log_signal(ticker, price, score, bias, sl, tp, sl_pct, tp_pct, atr_pct, earnings_warning=False):
     trades = load_log()
     today = datetime.now().strftime("%Y-%m-%d")
+    open_trades = [t for t in trades if t["status"] == "open"]
+
     # Skip if already have an open trade for this ticker
-    if any(t["ticker"] == ticker and t["status"] == "open" for t in trades):
+    if any(t["ticker"] == ticker for t in open_trades):
         return
     # Skip if already logged today
     if any(t["ticker"] == ticker and t["date"] == today for t in trades):
+        return
+    # Skip if at max open trades
+    if len(open_trades) >= MAX_OPEN_TRADES:
+        print(f"  [{ticker}] skipped — max {MAX_OPEN_TRADES} open trades reached")
+        return
+    # Skip if not enough cash remaining
+    account_usd = STARTING_BALANCE_JPY / USD_JPY_RATE
+    risk_usd = account_usd * RISK_PER_TRADE_PCT / 100
+    position_usd = min(risk_usd / (abs(sl_pct) / 100), account_usd * 0.20)
+    cash = available_cash_usd(trades)
+    if position_usd > cash:
+        print(f"  [{ticker}] skipped — insufficient cash (need ${position_usd:.0f}, have ${cash:.0f})")
         return
     fill_price = round(price * (1 + SLIPPAGE_PCT), 2)
     trades.append({

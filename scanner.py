@@ -4,7 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 
 import yfinance as yf
-from config import WATCHLIST, BUY_THRESHOLD, SELL_THRESHOLD, EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECEIVER, DASHBOARD_URL, STARTING_BALANCE_JPY, USD_JPY_RATE, RISK_PER_TRADE_PCT
+from config import WATCHLIST, BUY_THRESHOLD, SELL_THRESHOLD, EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECEIVER, DASHBOARD_URL, STARTING_BALANCE_JPY, USD_JPY_RATE, RISK_PER_TRADE_PCT, MAX_OPEN_TRADES
 from technicals import get_data, compute_signals, probability_score, get_spy_regime
 from news import get_news_sentiment
 from paperlog import log_signal, update_outcomes, summary, load_log
@@ -214,17 +214,23 @@ def run():
         results.append(result)
         if "error" not in result:
             print(f"Score: {result['score']}/100 ({result['bias']})")
-            # Auto-log bullish signals to paper trade ledger
-            if result["bias"] == "BULLISH":
-                price = result["price"]
-                atr_pct = result.get("atr_pct", 2.0)
-                sl_pct = round(-(atr_pct * 1.5), 1)
-                tp_pct = round(atr_pct * 2.5, 1)
-                sl = round(price * (1 + sl_pct / 100), 2)
-                tp = round(price * (1 + tp_pct / 100), 2)
-                log_signal(ticker, price, result["score"], result["bias"], sl, tp, sl_pct, tp_pct, atr_pct, result.get("earnings_warning", False))
         else:
             print(f"ERROR: {result['error']}")
+
+    # Log only the top MAX_OPEN_TRADES bullish signals by score (best setups, not first seen)
+    bullish = sorted(
+        [r for r in results if r.get("bias") == "BULLISH" and "error" not in r],
+        key=lambda r: r["score"], reverse=True
+    )
+    for result in bullish:
+        ticker = result["ticker"]
+        price = result["price"]
+        atr_pct = result.get("atr_pct", 2.0)
+        sl_pct = round(-(atr_pct * 1.5), 1)
+        tp_pct = round(atr_pct * 2.5, 1)
+        sl = round(price * (1 + sl_pct / 100), 2)
+        tp = round(price * (1 + tp_pct / 100), 2)
+        log_signal(ticker, price, result["score"], result["bias"], sl, tp, sl_pct, tp_pct, atr_pct, result.get("earnings_warning", False))
 
     # Persist today's raw signals to JSONL history (append-only, idempotent)
     append_day(results, spy_regime)

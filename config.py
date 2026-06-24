@@ -24,6 +24,9 @@ USD_JPY_RATE = 155  # update this manually if rate changes significantly
 # Rule: never risk more than this % of your account on one trade
 RISK_PER_TRADE_PCT = 5  # 5% of account per trade = ~¥3,000 = ~$20
 
+# Max simultaneous open trades — system won't open more than this at once
+MAX_OPEN_TRADES = 2
+
 # Dashboard URL
 DASHBOARD_URL = "https://yubasoba-lang.github.io/trading-scanner/dashboard.html"
 
