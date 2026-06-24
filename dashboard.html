@@ -451,13 +451,14 @@ function updateWLRow(ticker, price, chgPct) {
 }
 
 async function fetchAllPrices() {
-  await Promise.all(WATCHLIST.map(async t => {
+  for (const t of WATCHLIST) {
     try {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FINNHUB_KEY}`);
       const d = await res.json();
-      if(d.c) { prices[t]=d.c; updateWLRow(t, d.c, ((d.c-d.pc)/d.pc*100).toFixed(2)); }
-    } catch(e){}
-  }));
+      if (d.c) { prices[t]=d.c; updateWLRow(t, d.c, ((d.c-d.pc)/d.pc*100).toFixed(2)); }
+    } catch(e) {}
+    await new Promise(r => setTimeout(r, 120)); // ~8 req/s, stays under 60/min
+  }
 }
 
 function round2(n) { return Math.round(n * 100) / 100; }
