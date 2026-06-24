@@ -493,7 +493,12 @@ function renderSignals() {
         <div class="lev"><div class="lev-label">SL</div><div class="lev-val dn">$${t.sl}</div></div>
         <div class="lev"><div class="lev-label">TP</div><div class="lev-val up">$${t.tp}</div></div>
       </div>
-      <div class="sig-meta">ATR ${t.atr_pct}% · R/R 1:${(t.tp_pct/Math.abs(t.sl_pct)).toFixed(1)}${t.earnings_warning?' · ⚠ Earnings':''}</div>
+      <div class="sig-meta">
+        <span style="color:${t.macd_bullish===false?'#f85149':'#3fb950'};font-weight:600">
+          ${t.macd_bullish===false?'MACD ↓ Bearish':'MACD ↑ Bullish'}
+        </span>
+        · ATR ${t.atr_pct}% · R/R 1:${(t.tp_pct/Math.abs(t.sl_pct)).toFixed(1)}${t.earnings_warning?' · ⚠ Earnings':''}
+      </div>
       ${alreadyBought
         ? `<div class="buy-btn bought">Already in your trades</div>`
         : `<div class="buy-btn" onclick="showBuyForm(${t.id})">Buy in Your Account</div>
