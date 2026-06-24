@@ -408,14 +408,28 @@ function setRes(r, el) {
 }
 
 // ── Watchlist ─────────────────────────────────────────────────────────
+function sortedWatchlist() {
+  const scoreMap = {};
+  dailyScores.forEach(r => scoreMap[r.ticker] = r.score);
+  return [...WATCHLIST].sort((a, b) => {
+    const sa = scoreMap[a] ?? -1;
+    const sb = scoreMap[b] ?? -1;
+    return sb - sa;
+  });
+}
+
 function buildWatchlist() {
-  document.getElementById('ticker-tabs').innerHTML = WATCHLIST.map(t =>
+  const sorted = sortedWatchlist();
+  document.getElementById('ticker-tabs').innerHTML = sorted.map(t =>
     `<div class="ticker-tab${t===currentTicker?' active':''}" id="tab-${t}" onclick="selectTicker('${t}')">${t}<span class="chg" id="chg-${t}"></span></div>`).join('');
-  document.getElementById('watchlist').innerHTML = WATCHLIST.map(t =>
-    `<div class="wl-row${t===currentTicker?' active':''}" id="wlrow-${t}" onclick="selectTicker('${t}')">
-      <div class="wl-left"><div class="wl-ticker">${t}</div><div class="wl-chg" id="wlchg-${t}">—</div></div>
+  document.getElementById('watchlist').innerHTML = sorted.map(t => {
+    const score = dailyScores.find(r=>r.ticker===t)?.score;
+    const scoreHtml = score != null ? `<span style="font-size:10px;color:var(--dim);margin-left:4px">${score}</span>` : '';
+    return `<div class="wl-row${t===currentTicker?' active':''}" id="wlrow-${t}" onclick="selectTicker('${t}')">
+      <div class="wl-left"><div class="wl-ticker">${t}${scoreHtml}</div><div class="wl-chg" id="wlchg-${t}">—</div></div>
       <div class="wl-price" id="wlprice-${t}">—</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function selectTicker(t) {
