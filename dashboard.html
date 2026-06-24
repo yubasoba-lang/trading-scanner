@@ -129,7 +129,7 @@
 <div id="main">
   <!-- SIDEBAR -->
   <div id="sidebar">
-    <div class="acct-card">
+    <div class="acct-card" id="sys-acct-card">
       <div class="acct-name">SYSTEM ACCOUNT</div>
       <div class="acct-val" id="sys-val">¥60,000</div>
       <div class="acct-pnl" id="sys-pnl"></div>
@@ -141,7 +141,7 @@
         <div class="stat-box"><div class="stat-label">LOSSES</div><div class="stat-val dn" id="sys-losses">0</div></div>
       </div>
     </div>
-    <div class="acct-card">
+    <div class="acct-card" id="you-acct-card">
       <div class="acct-name">YOUR ACCOUNT</div>
       <div class="acct-val" id="you-val">¥60,000</div>
       <div class="acct-pnl" id="you-pnl"></div>
@@ -621,6 +621,26 @@ function setView(view, el) {
   currentView = view;
   document.querySelectorAll('.acct-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
+
+  // Switch sidebar highlight
+  document.getElementById('sys-acct-card').style.opacity = view==='you' ? '0.4' : '1';
+  document.getElementById('you-acct-card').style.opacity = view==='system' ? '0.4' : '1';
+
+  // Switch bottom tab to match
+  if (view === 'system') {
+    document.querySelectorAll('.btab').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.btab').classList.add('active');
+    currentTab = 'sys-open';
+  } else if (view === 'you') {
+    document.querySelectorAll('.btab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.btab')[1].classList.add('active');
+    currentTab = 'you-open';
+  } else {
+    document.querySelectorAll('.btab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.btab')[3].classList.add('active');
+    currentTab = 'compare';
+  }
+  renderTab();
 }
 
 function renderTab() {
