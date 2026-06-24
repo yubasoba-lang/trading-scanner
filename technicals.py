@@ -14,14 +14,15 @@ def compute_signals(df: pd.DataFrame) -> dict:
 
     rsi_series = ta.momentum.RSIIndicator(close).rsi()
     rsi = rsi_series.iloc[-1]
-    rsi_prev = rsi_series.iloc[-2]
-    rsi_slope = float(rsi - rsi_prev)  # positive = RSI rising, negative = falling
+    # Smooth slope over 3 days to avoid day-to-day noise
+    rsi_slope = float(rsi_series.iloc[-1] - rsi_series.iloc[-4]) / 3
 
     macd_obj = ta.trend.MACD(close)
     macd = macd_obj.macd().iloc[-1]
     macd_signal = macd_obj.macd_signal().iloc[-1]
     macd_hist = macd_obj.macd_diff()
-    macd_hist_slope = float(macd_hist.iloc[-1] - macd_hist.iloc[-2])  # histogram expanding or contracting
+    # Smooth histogram slope over 3 days
+    macd_hist_slope = float(macd_hist.iloc[-1] - macd_hist.iloc[-4]) / 3
 
     bb = ta.volatility.BollingerBands(close)
     bb_high = bb.bollinger_hband()
@@ -67,30 +68,37 @@ def compute_signals(df: pd.DataFrame) -> dict:
     }
 
 
-def get_spy_regime() -> str:
-    """Returns 'bull' if SPY is above its 50 EMA, 'bear' otherwise."""
+def get_spy_regime() -> dict:
+    """
+    Returns how far SPY is from its 50 EMA as a continuous gradient.
+    deviation > 0 = above EMA (bull), < 0 = below (bear).
+    Also returns the 3-day slope of SPY itself.
+    """
     try:
         df = get_data("SPY", period="3mo")
         close = df["close"]
-        ema50 = ta.trend.EMAIndicator(close, window=50).ema_indicator().iloc[-1]
-        return "bull" if close.iloc[-1] > ema50 else "bear"
+        ema50 = ta.trend.EMAIndicator(close, window=50).ema_indicator()
+        price = float(close.iloc[-1])
+        ema = float(ema50.iloc[-1])
+        deviation_pct = (price - ema) / ema * 100  # % above/below EMA50
+        spy_slope = float(close.iloc[-1] - close.iloc[-4]) / 3  # 3-day price slope
+        return {"deviation_pct": round(deviation_pct, 2), "slope": round(spy_slope, 2)}
     except:
-        return "bull"  # default to neutral if fetch fails
+        return {"deviation_pct": 0.0, "slope": 0.0}
 
 
-def probability_score(signals: dict, spy_regime: str = "bull") -> int:
+def probability_score(signals: dict, spy_regime: dict = None) -> int:
     """
     Returns a 0-100 score. Above 65 = bullish, below 35 = bearish.
 
-    Improvements over v1:
-    - Continuous scoring: signals scale smoothly instead of snapping at thresholds
-    - Slope/delta: rewards RSI rising, penalises RSI falling (same level, different story)
-    - MACD histogram slope: accelerating momentum scores higher than decelerating
-    - BB squeeze bonus: volatility compression often precedes a breakout
-    - Volume building: sustained volume increase is stronger than one-day spike
-    - Regime awareness: broad market downtrend applies a global penalty
-    - MACD veto gate preserved: bearish crossover caps score at 55 regardless
+    Regime penalty is a continuous gradient (not binary):
+    - SPY 5%+ above EMA50: no penalty (strong bull market)
+    - SPY at EMA50: -5 on bullish components
+    - SPY 5%+ below EMA50: -12 on bullish components (headwind)
+    This shrinks appetite for longs in downtrends without distorting the sell side.
     """
+    if spy_regime is None:
+        spy_regime = {"deviation_pct": 0.0, "slope": 0.0}
     score = 50.0
 
     # --- RSI: continuous ramp from +15 (RSI=30) to 0 (RSI=50) to -15 (RSI=70) ---
@@ -162,9 +170,13 @@ def probability_score(signals: dict, spy_regime: str = "bull") -> int:
     else:
         score -= 3   # histogram shrinking — momentum fading
 
-    # --- Regime awareness: broad market context ---
-    if spy_regime == "bear":
-        score -= 10  # buying in a downtrend market is swimming against the current
+    # --- Regime awareness: continuous gradient, only penalises bullish appetite ---
+    # Scale: 0 penalty at SPY +5% above EMA, max -12 at SPY -5% below EMA
+    dev = spy_regime.get("deviation_pct", 0.0)
+    regime_penalty = max(0, min(12, -dev * 1.2 + 6)) if dev < 5 else 0
+    # Only subtract from the bullish component (above 50), not sell signals
+    if score > 50:
+        score -= regime_penalty * ((score - 50) / 50)  # proportional to how bullish the setup is
 
     score = max(0, min(100, score))
 

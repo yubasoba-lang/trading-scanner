@@ -202,7 +202,9 @@ def run():
     update_outcomes()
 
     spy_regime = get_spy_regime()
-    print(f"Market regime: SPY {'above' if spy_regime == 'bull' else 'BELOW'} 50 EMA → {spy_regime.upper()} market\n")
+    dev = spy_regime.get("deviation_pct", 0)
+    direction = "above" if dev >= 0 else "BELOW"
+    print(f"Market regime: SPY {direction} 50 EMA by {abs(dev):.1f}%\n")
 
     results = []
     for ticker in WATCHLIST:

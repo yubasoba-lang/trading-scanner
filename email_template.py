@@ -148,6 +148,36 @@ def build_html_email(results, paper_summary, dashboard_url, starting_balance_jpy
         <div style="font-size:11px;color:{color};letter-spacing:1px;margin:24px 0 12px;font-weight:600">{title}</div>
         {cards}"""
 
+    def watchlist_section(all_results):
+        """Shown when nothing is bullish — top 5 by score so the email is never empty."""
+        valid = [r for r in all_results if "error" not in r and r.get("bias") != "BULLISH"]
+        top5 = sorted(valid, key=lambda x: x.get("score", 0), reverse=True)[:5]
+        if not top5:
+            return ""
+        rows = "".join(f"""
+        <tr style="border-bottom:1px solid #eeeeee">
+          <td style="padding:10px 16px;font-weight:700;color:#111">{r['ticker']}</td>
+          <td style="padding:10px 16px;color:#555">${r['price']}</td>
+          <td style="padding:10px 16px;color:#555">{r['score']}/100</td>
+          <td style="padding:10px 16px;color:#{'1a7a45' if r.get('macd_bullish') else 'c0392b'};font-size:12px">
+            {'MACD ↑' if r.get('macd_bullish') else 'MACD ↓'} · RSI {r['rsi']}
+          </td>
+          <td style="padding:10px 16px;color:#999;font-size:12px">{r.get('ema_trend','—')} trend</td>
+        </tr>""" for r in top5)
+        return f"""
+        <div style="font-size:11px;color:#888;letter-spacing:1px;margin:24px 0 12px;font-weight:600">── NO STRONG SETUPS TODAY — TOP WATCHLIST CANDIDATES</div>
+        <div style="font-size:12px;color:#999;margin-bottom:10px">Nothing cleared the buy threshold. These are the closest — watch them for tomorrow.</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:12px;border:1px solid #e0e0e0;overflow:hidden">
+          <tr style="border-bottom:1px solid #eeeeee;background:#f9f9f9">
+            <th style="padding:10px 16px;text-align:left;font-size:10px;color:#999;font-weight:500;letter-spacing:1px">TICKER</th>
+            <th style="padding:10px 16px;text-align:left;font-size:10px;color:#999;font-weight:500;letter-spacing:1px">PRICE</th>
+            <th style="padding:10px 16px;text-align:left;font-size:10px;color:#999;font-weight:500;letter-spacing:1px">SCORE</th>
+            <th style="padding:10px 16px;text-align:left;font-size:10px;color:#999;font-weight:500;letter-spacing:1px">MOMENTUM</th>
+            <th style="padding:10px 16px;text-align:left;font-size:10px;color:#999;font-weight:500;letter-spacing:1px">TREND</th>
+          </tr>
+          {rows}
+        </table>"""
+
     bearish_rows = "".join(f"""
         <tr style="border-bottom:1px solid #eeeeee">
           <td style="padding:10px 16px;font-weight:700;color:#111">{r['ticker']}</td>
@@ -212,6 +242,7 @@ def build_html_email(results, paper_summary, dashboard_url, starting_balance_jpy
 
     <!-- Signals -->
     {section("▲ BULLISH SETUPS — CONSIDER BUYING", bullish, "#1a7a45")}
+    {watchlist_section(results) if not bullish else ""}
     {bearish_section}
 
     <!-- How to use -->
