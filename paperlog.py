@@ -23,6 +23,10 @@ SLIPPAGE_PCT = 0.001
 def log_signal(ticker, price, score, bias, sl, tp, sl_pct, tp_pct, atr_pct, earnings_warning=False):
     trades = load_log()
     today = datetime.now().strftime("%Y-%m-%d")
+    # Skip if already have an open trade for this ticker
+    if any(t["ticker"] == ticker and t["status"] == "open" for t in trades):
+        return
+    # Skip if already logged today
     if any(t["ticker"] == ticker and t["date"] == today for t in trades):
         return
     fill_price = round(price * (1 + SLIPPAGE_PCT), 2)
