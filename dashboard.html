@@ -271,6 +271,8 @@ function savePAT() {
   if (!pat) return;
   localStorage.setItem('gh_pat', pat);
   document.getElementById('pat-modal').classList.remove('show');
+  const btn = document.getElementById('gh-connect-btn');
+  if (btn) btn.innerHTML = '✓ GitHub connected';
   init();
 }
 function skipPAT() {
@@ -279,6 +281,8 @@ function skipPAT() {
 
 // ── Init ──────────────────────────────────────────────────────────────
 async function init() {
+  const btn = document.getElementById('gh-connect-btn');
+  if (btn) btn.innerHTML = pat ? '✓ GitHub connected' : '🔗 Connect GitHub to sync trades';
   buildWatchlist();
   initChart();
   await Promise.all([
