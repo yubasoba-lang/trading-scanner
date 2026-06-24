@@ -15,7 +15,8 @@
   body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
   #topbar{display:flex;align-items:center;gap:12px;padding:0 16px;height:48px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
   .logo{font-weight:700;font-size:14px;color:var(--gold);letter-spacing:1px;margin-right:8px}
-  .ticker-tabs{display:flex;gap:2px;flex:1;overflow:hidden}
+  .ticker-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .ticker-tabs::-webkit-scrollbar{display:none}
   .ticker-tab{padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--dim);white-space:nowrap}
   .ticker-tab:hover{background:var(--hover);color:var(--text)}
   .ticker-tab.active{background:var(--border2);color:var(--text)}
