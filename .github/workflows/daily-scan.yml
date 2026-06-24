@@ -2,7 +2,7 @@ name: Daily Trading Scan
 
 on:
   schedule:
-    - cron: '0 5 * * 1-5'  # 7am Budapest time (UTC+2), Monday–Friday
+    - cron: '0 11 * * 1-5'  # 1pm Budapest time (UTC+2), Monday–Friday
   workflow_dispatch:
 
 permissions:

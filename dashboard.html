@@ -516,8 +516,7 @@ function updateSidebar() {
 
 // ── Signals panel ─────────────────────────────────────────────────────
 function renderSignals() {
-  const today = new Date().toISOString().slice(0, 10);
-  const todayTrades = trades.filter(t => t.date === today);
+  const todayTrades = trades.filter(t => t.status === 'open');
   const container = document.getElementById('signals-list');
 
   if (!todayTrades.length) {
