@@ -299,10 +299,10 @@ async function init() {
     loadFile(SYS_FILE).then(d => sysTrades = d),
     loadFile(YOU_FILE).then(d => myTrades = d),
     loadDailyScores().then(d => dailyScores = d),
-    fetchAllPrices()
   ]);
-  buildWatchlist();
+  buildWatchlist(); // build DOM first so updateWLRow has rows to update
   updateSidebar();
+  fetchAllPrices(); // runs in background, updates rows as prices arrive
   renderRPanel();
   renderTab();
   loadCandles(currentTicker, currentRes);
