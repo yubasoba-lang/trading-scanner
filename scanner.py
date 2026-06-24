@@ -9,6 +9,7 @@ from technicals import get_data, compute_signals, probability_score, get_spy_reg
 from news import get_news_sentiment
 from paperlog import log_signal, update_outcomes, summary, load_log
 from email_template import build_html_email
+from history import append_day
 
 
 SENTIMENT_BOOST = {"positive": 8, "neutral": 0, "negative": -8, "unavailable": 0, "error": 0}
@@ -224,6 +225,10 @@ def run():
                 log_signal(ticker, price, result["score"], result["bias"], sl, tp, sl_pct, tp_pct, atr_pct, result.get("earnings_warning", False))
         else:
             print(f"ERROR: {result['error']}")
+
+    # Persist today's raw signals to JSONL history (append-only, idempotent)
+    append_day(results, spy_regime)
+    print("Signal history updated → daily_scores.jsonl")
 
     trades = load_log()
     html = build_html_email(results, trades, DASHBOARD_URL, STARTING_BALANCE_JPY, USD_JPY_RATE, RISK_PER_TRADE_PCT)
