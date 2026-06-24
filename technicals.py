@@ -12,16 +12,29 @@ def get_data(ticker: str, period: str = "3mo") -> pd.DataFrame:
 def compute_signals(df: pd.DataFrame) -> dict:
     close = df["close"]
 
-    rsi = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
+    rsi_series = ta.momentum.RSIIndicator(close).rsi()
+    rsi = rsi_series.iloc[-1]
+    rsi_prev = rsi_series.iloc[-2]
+    rsi_slope = float(rsi - rsi_prev)  # positive = RSI rising, negative = falling
 
     macd_obj = ta.trend.MACD(close)
     macd = macd_obj.macd().iloc[-1]
     macd_signal = macd_obj.macd_signal().iloc[-1]
+    macd_hist = macd_obj.macd_diff()
+    macd_hist_slope = float(macd_hist.iloc[-1] - macd_hist.iloc[-2])  # histogram expanding or contracting
 
     bb = ta.volatility.BollingerBands(close)
-    bb_high = bb.bollinger_hband().iloc[-1]
-    bb_low = bb.bollinger_lband().iloc[-1]
+    bb_high = bb.bollinger_hband()
+    bb_low = bb.bollinger_lband()
     price = close.iloc[-1]
+    bb_pos = float((price - bb_low.iloc[-1]) / (bb_high.iloc[-1] - bb_low.iloc[-1]) * 100)
+    bb_pos_prev = float((close.iloc[-2] - bb_low.iloc[-2]) / (bb_high.iloc[-2] - bb_low.iloc[-2]) * 100)
+    bb_slope = bb_pos - bb_pos_prev  # positive = moving toward upper band
+
+    # Bollinger Band width — narrow = squeeze (big move coming), wide = expanded
+    bb_width = float((bb_high.iloc[-1] - bb_low.iloc[-1]) / close.iloc[-1] * 100)
+    bb_width_prev = float((bb_high.iloc[-5] - bb_low.iloc[-5]) / close.iloc[-5] * 100)
+    bb_squeeze = bb_width < bb_width_prev * 0.85  # bands tightened >15% in 5 days
 
     ema20 = ta.trend.EMAIndicator(close, window=20).ema_indicator().iloc[-1]
     ema50 = ta.trend.EMAIndicator(close, window=50).ema_indicator().iloc[-1]
@@ -29,6 +42,10 @@ def compute_signals(df: pd.DataFrame) -> dict:
     volume_today = df["volume"].iloc[-1]
     volume_avg = df["volume"].rolling(20).mean().iloc[-1]
     volume_ratio = volume_today / volume_avg if volume_avg > 0 else 1.0
+    # Volume trend: is volume building over last 3 days?
+    vol_3day_avg = df["volume"].iloc[-3:].mean()
+    vol_prior_avg = df["volume"].iloc[-6:-3].mean()
+    volume_building = bool(vol_3day_avg > vol_prior_avg * 1.1)
 
     atr = ta.volatility.AverageTrueRange(df["high"], df["low"], close, window=14).average_true_range().iloc[-1]
     atr_pct = round(float(atr / price * 100), 2)
@@ -36,60 +53,127 @@ def compute_signals(df: pd.DataFrame) -> dict:
     return {
         "price": round(float(price), 2),
         "rsi": round(float(rsi), 1),
+        "rsi_slope": round(rsi_slope, 2),       # rising or falling
         "macd_bullish": bool(macd > macd_signal),
-        "above_bb_mid": bool(price > (bb_high + bb_low) / 2),
-        "bb_position": round(float((price - bb_low) / (bb_high - bb_low) * 100), 1),
+        "macd_hist_slope": round(macd_hist_slope, 4),  # momentum accelerating or dying
+        "above_bb_mid": bool(price > (bb_high.iloc[-1] + bb_low.iloc[-1]) / 2),
+        "bb_position": round(bb_pos, 1),
+        "bb_slope": round(bb_slope, 2),          # moving up or down within bands
+        "bb_squeeze": bb_squeeze,                # volatility compression = big move ahead
         "ema_trend": "bullish" if ema20 > ema50 else "bearish",
         "volume_ratio": round(float(volume_ratio), 2),
+        "volume_building": volume_building,
         "atr_pct": atr_pct,
     }
 
 
-def probability_score(signals: dict) -> int:
-    """
-    Returns a 0-100 score. Above 65 = bullish bias, below 35 = bearish bias.
-    MACD acts as a momentum veto: bearish crossover hard-caps score at 55 (no buy),
-    bullish crossover hard-floors score at 45 (no sell). This prevents EMA/RSI
-    from dragging a conflicted setup into a buy signal.
-    """
-    score = 50  # neutral baseline
+def get_spy_regime() -> str:
+    """Returns 'bull' if SPY is above its 50 EMA, 'bear' otherwise."""
+    try:
+        df = get_data("SPY", period="3mo")
+        close = df["close"]
+        ema50 = ta.trend.EMAIndicator(close, window=50).ema_indicator().iloc[-1]
+        return "bull" if close.iloc[-1] > ema50 else "bear"
+    except:
+        return "bull"  # default to neutral if fetch fails
 
-    # RSI: oversold = bullish setup, overbought = bearish
+
+def probability_score(signals: dict, spy_regime: str = "bull") -> int:
+    """
+    Returns a 0-100 score. Above 65 = bullish, below 35 = bearish.
+
+    Improvements over v1:
+    - Continuous scoring: signals scale smoothly instead of snapping at thresholds
+    - Slope/delta: rewards RSI rising, penalises RSI falling (same level, different story)
+    - MACD histogram slope: accelerating momentum scores higher than decelerating
+    - BB squeeze bonus: volatility compression often precedes a breakout
+    - Volume building: sustained volume increase is stronger than one-day spike
+    - Regime awareness: broad market downtrend applies a global penalty
+    - MACD veto gate preserved: bearish crossover caps score at 55 regardless
+    """
+    score = 50.0
+
+    # --- RSI: continuous ramp from +15 (RSI=30) to 0 (RSI=50) to -15 (RSI=70) ---
     rsi = signals["rsi"]
-    if rsi < 30:
-        score += 15
-    elif rsi < 45:
-        score += 7
-    elif rsi > 70:
-        score -= 15
-    elif rsi > 55:
-        score -= 5
-
-    # Bollinger Band position
-    bb_pos = signals["bb_position"]
-    if bb_pos < 20:
-        score += 10
-    elif bb_pos > 80:
-        score -= 10
-
-    # EMA trend (lagging — weighted less than momentum)
-    if signals["ema_trend"] == "bullish":
-        score += 7
+    if rsi <= 50:
+        rsi_points = 15 * (50 - rsi) / 20   # +15 at RSI 30, 0 at RSI 50
+        rsi_points = min(rsi_points, 15)
     else:
-        score -= 7
+        rsi_points = -15 * (rsi - 50) / 20  # 0 at RSI 50, -15 at RSI 70
+        rsi_points = max(rsi_points, -15)
+    score += rsi_points
 
-    # Volume confirmation
-    if signals["volume_ratio"] > 1.5 and signals["macd_bullish"]:
-        score += 5
+    # RSI slope bonus: rising RSI = bounce, falling RSI = weakening
+    rsi_slope = signals["rsi_slope"]
+    if rsi_slope > 3:
+        score += 5   # RSI rising fast — momentum picking up
+    elif rsi_slope > 1:
+        score += 2
+    elif rsi_slope < -3:
+        score -= 5   # RSI falling fast — momentum dying
+    elif rsi_slope < -1:
+        score -= 2
+
+    # --- Bollinger Band position: continuous ramp ---
+    bb_pos = signals["bb_position"]
+    bb_points = 10 * (50 - bb_pos) / 50     # +10 at BB=0, 0 at BB=50, -10 at BB=100
+    bb_points = max(-10, min(10, bb_points))
+    score += bb_points
+
+    # BB slope: price moving toward lower band = bearish, upper = bullish
+    bb_slope = signals["bb_slope"]
+    if bb_slope > 5:
+        score += 3   # price rising within bands
+    elif bb_slope < -5:
+        score -= 3
+
+    # BB squeeze: bands tightening = big move brewing (direction-agnostic, slight bonus)
+    if signals["bb_squeeze"] and signals["macd_bullish"]:
+        score += 4   # squeeze + bullish momentum = setup forming
+
+    # --- EMA trend (lagging, lower weight) ---
+    if signals["ema_trend"] == "bullish":
+        score += 6
+    else:
+        score -= 6
+
+    # --- Volume ---
+    vol_ratio = signals["volume_ratio"]
+    if signals["macd_bullish"]:
+        # Volume confirmation on bullish momentum
+        if vol_ratio > 2.0:
+            score += 6
+        elif vol_ratio > 1.5:
+            score += 4
+        elif vol_ratio > 1.2:
+            score += 2
+    else:
+        # High volume on bearish momentum = distribution (selling)
+        if vol_ratio > 1.5:
+            score -= 3
+
+    if signals["volume_building"] and signals["macd_bullish"]:
+        score += 3   # sustained volume increase behind bullish move
+
+    # --- MACD histogram slope: is momentum accelerating or dying? ---
+    macd_hist_slope = signals["macd_hist_slope"]
+    if macd_hist_slope > 0:
+        score += 3   # histogram expanding in bullish direction
+    else:
+        score -= 3   # histogram shrinking — momentum fading
+
+    # --- Regime awareness: broad market context ---
+    if spy_regime == "bear":
+        score -= 10  # buying in a downtrend market is swimming against the current
 
     score = max(0, min(100, score))
 
-    # MACD veto gate: momentum overrides trend alignment
-    # Bearish crossover → cap at 55 (below buy threshold of 65)
-    # Bullish crossover → floor at 45 (above sell threshold of 35)
+    # --- MACD veto gate (preserved from v2) ---
+    # Bearish crossover: no matter how good everything else looks, cap at 55
+    # Bullish crossover: floor at 45 so minor negatives can't flip it to sell
     if not signals["macd_bullish"]:
         score = min(score, 55)
     else:
         score = max(score, 45)
 
-    return score
+    return int(round(score))

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import yfinance as yf
 from config import WATCHLIST, BUY_THRESHOLD, SELL_THRESHOLD, EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECEIVER, DASHBOARD_URL, STARTING_BALANCE_JPY, USD_JPY_RATE, RISK_PER_TRADE_PCT
-from technicals import get_data, compute_signals, probability_score
+from technicals import get_data, compute_signals, probability_score, get_spy_regime
 from news import get_news_sentiment
 from paperlog import log_signal, update_outcomes, summary, load_log
 from email_template import build_html_email
@@ -28,11 +28,11 @@ def check_earnings_soon(ticker: str) -> bool:
         return False
 
 
-def analyze_ticker(ticker: str) -> dict:
+def analyze_ticker(ticker: str, spy_regime: str = "bull") -> dict:
     try:
         df = get_data(ticker)
         signals = compute_signals(df)
-        tech_score = probability_score(signals)
+        tech_score = probability_score(signals, spy_regime)
 
         news = get_news_sentiment(ticker)
         sentiment_adj = SENTIMENT_BOOST.get(news["sentiment"], 0)
@@ -53,10 +53,15 @@ def analyze_ticker(ticker: str) -> dict:
             "score": final_score,
             "bias": bias,
             "rsi": signals["rsi"],
+            "rsi_slope": signals["rsi_slope"],
             "ema_trend": signals["ema_trend"],
             "macd_bullish": signals["macd_bullish"],
+            "macd_hist_slope": signals["macd_hist_slope"],
             "volume_ratio": signals["volume_ratio"],
+            "volume_building": signals["volume_building"],
+            "bb_squeeze": signals["bb_squeeze"],
             "atr_pct": signals["atr_pct"],
+            "spy_regime": spy_regime,
             "news_sentiment": news["sentiment"],
             "top_headlines": news.get("headlines", []),
             "news_summary": news.get("summary", ""),
@@ -196,10 +201,13 @@ def run():
     # First update any open paper trades with latest prices
     update_outcomes()
 
+    spy_regime = get_spy_regime()
+    print(f"Market regime: SPY {'above' if spy_regime == 'bull' else 'BELOW'} 50 EMA → {spy_regime.upper()} market\n")
+
     results = []
     for ticker in WATCHLIST:
         print(f"  Analyzing {ticker}...", end=" ", flush=True)
-        result = analyze_ticker(ticker)
+        result = analyze_ticker(ticker, spy_regime)
         results.append(result)
         if "error" not in result:
             print(f"Score: {result['score']}/100 ({result['bias']})")
