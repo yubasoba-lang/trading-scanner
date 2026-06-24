@@ -302,7 +302,7 @@ async function init() {
   ]);
   buildWatchlist(); // build DOM first so updateWLRow has rows to update
   updateSidebar();
-  fetchAllPrices(); // runs in background, updates rows as prices arrive
+  fetchAllPrices().then(() => { updateSidebar(); renderTab(); }); // re-render once prices are in
   renderRPanel();
   renderTab();
   loadCandles(currentTicker, currentRes);
