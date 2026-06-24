@@ -224,7 +224,7 @@ const STARTING_JPY = 60000;
 const USD_JPY = 155;
 const STARTING_USD = STARTING_JPY / USD_JPY;
 
-let sysTrades = [], myTrades = [];
+let sysTrades = [], myTrades = [], dailyScores = [];
 let prices = {};
 let currentTicker = 'NVDA', currentRes = 'D', currentView = 'system', currentTab = 'sys-open', currentRTab = 'signals';
 let chart, candleSeries, volumeSeries, ema20S, ema50S, rsiS, rsiOB, rsiOS;
@@ -265,6 +265,16 @@ async function loadFile(filename) {
   } catch(e) { return []; }
 }
 
+async function loadDailyScores() {
+  try {
+    const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/main/daily_scores.jsonl?t=${Date.now()}`;
+    const res = await fetch(url);
+    const text = await res.text();
+    const today = new Date().toISOString().slice(0,10);
+    return text.split('\n').filter(l=>l.trim()).map(l=>JSON.parse(l)).filter(r=>r.date===today);
+  } catch(e) { return []; }
+}
+
 // ── PAT setup ──────────────────────────────────────────────────────────
 function savePAT() {
   pat = document.getElementById('pat-input').value.trim();
@@ -288,6 +298,7 @@ async function init() {
   await Promise.all([
     loadFile(SYS_FILE).then(d => sysTrades = d),
     loadFile(YOU_FILE).then(d => myTrades = d),
+    loadDailyScores().then(d => dailyScores = d),
     fetchAllPrices()
   ]);
   updateSidebar();
@@ -486,9 +497,12 @@ function renderRPanel() {
 
 function renderSignals() {
   const el = document.getElementById('right-content');
-  if (!sysTrades.length) { el.innerHTML='<div class="empty">No signals yet</div>'; return; }
   const signals = sysTrades.filter(t=>t.status==='open');
-  el.innerHTML = signals.map(t => {
+
+  // Bearish tickers from today's daily scores
+  const bearish = dailyScores.filter(r=>r.bias==='BEARISH');
+
+  const bullishHtml = signals.length ? signals.map(t => {
     const alreadyBought = myTrades.some(m=>m.ref_id===t.id&&m.status==='open');
     const defaultAmt = Math.round(Math.min(STARTING_USD*0.05/(Math.abs(t.sl_pct)/100), STARTING_USD*0.20));
     return `<div class="signal-card">
@@ -523,8 +537,24 @@ function renderSignals() {
            </div>`
       }
     </div>`;
-  }).join('') || '<div class="empty">No open signals</div>';
-  // Init amount info for visible forms
+  }).join('') : '<div class="empty">No bullish signals today</div>';
+
+  const bearishHtml = bearish.length ? `
+    <div style="margin:12px 0 8px;padding:8px 12px;border-top:1px solid var(--border2);font-size:10px;color:#f85149;letter-spacing:1px;font-weight:600">▼ BEARISH — AVOID OR EXIT</div>
+    ${bearish.map(r => `
+      <div class="signal-card" style="opacity:0.7">
+        <div class="sig-top">
+          <div class="sig-ticker" onclick="selectTicker('${r.ticker}')">${r.ticker}</div>
+          <div class="sig-score" style="background:#3a1a1a;color:#f85149">${r.score}/100</div>
+        </div>
+        <div class="sig-meta" style="margin-top:4px">
+          <span style="color:#f85149;font-weight:600">MACD ↓ Bearish</span>
+          · RSI ${r.rsi} · ATR ${r.atr_pct}%
+        </div>
+        <div style="font-size:11px;color:var(--dim);padding:4px 0">Avoid buying · exit if holding</div>
+      </div>`).join('')}` : '';
+
+  el.innerHTML = bullishHtml + bearishHtml;
   signals.forEach(t => updateBuyInfo(t.id, t.sl_pct, t.tp_pct));
 }
 
