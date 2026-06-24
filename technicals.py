@@ -180,11 +180,13 @@ def probability_score(signals: dict, spy_regime: dict = None) -> int:
 
     score = max(0, min(100, score))
 
-    # --- MACD veto gate (preserved from v2) ---
-    # Bearish crossover: no matter how good everything else looks, cap at 55
-    # Bullish crossover: floor at 45 so minor negatives can't flip it to sell
+    # --- MACD veto gate ---
+    # Bearish crossover: cap at 62 — still below the 65 buy threshold,
+    # but allows a strongly aligned setup to show up as a near-miss watchlist candidate.
+    # Raised from 55 because 55 made "no buys ever" too common in mixed markets.
+    # Bullish crossover: floor at 45 so minor negatives can't flip it to sell.
     if not signals["macd_bullish"]:
-        score = min(score, 55)
+        score = min(score, 62)
     else:
         score = max(score, 45)
 
