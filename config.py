@@ -28,7 +28,7 @@ RISK_PER_TRADE_PCT = 5  # 5% of account per trade = ~¥3,000 = ~$20
 DASHBOARD_URL = "https://yubasoba-lang.github.io/trading-scanner/dashboard.html"
 
 # Probability score thresholds
-BUY_THRESHOLD = 62    # score >= this → potential buy signal
+BUY_THRESHOLD = 65    # score >= this → potential buy signal
 SELL_THRESHOLD = 35   # score <= this → potential sell / avoid signal
 
 # Keys injected by GitHub Actions secrets (or set locally via environment)

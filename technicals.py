@@ -186,7 +186,7 @@ def probability_score(signals: dict, spy_regime: dict = None) -> int:
     # Raised from 55 because 55 made "no buys ever" too common in mixed markets.
     # Bullish crossover: floor at 45 so minor negatives can't flip it to sell.
     if not signals["macd_bullish"]:
-        score = min(score, 62)
+        score = min(score, 55)
     else:
         score = max(score, 45)
 
