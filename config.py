@@ -14,6 +14,8 @@ WATCHLIST = [
     "COST", "WMT",
     # Broad market ETFs
     "SPY", "QQQ",
+    # High interest
+    "SPCX",
 ]
 
 # Starting balance in JPY for paper trading simulation
