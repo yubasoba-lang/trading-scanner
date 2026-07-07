@@ -43,8 +43,20 @@ def build_html_email(results, paper_summary, dashboard_url, starting_balance_jpy
         elif rsi > 55: rsi_label = "heating up"
         else: rsi_label = "neutral"
 
-        macd_label = "Bullish crossover ↑" if r.get("macd_bullish") else "Bearish crossover ↓"
-        macd_color = "#1a7a45" if r.get("macd_bullish") else "#c0392b"
+        macd_std = r.get("macd_bullish", False)
+        macd_fast = r.get("macd_fast_bullish", False)
+        if macd_std and macd_fast:
+            macd_label = "Bullish ↑ (both signals agree)"
+            macd_color = "#1a7a45"
+        elif macd_fast and not macd_std:
+            macd_label = "Fast MACD bullish ↑ (early signal, higher risk)"
+            macd_color = "#e67e22"
+        elif macd_std and not macd_fast:
+            macd_label = "Standard MACD bullish ↑"
+            macd_color = "#1a7a45"
+        else:
+            macd_label = "Bearish crossover ↓"
+            macd_color = "#c0392b"
         ema_trend = r.get("ema_trend", "—")
         vol = r.get("volume_ratio", 1.0)
         vol_label = f"{vol}x avg volume" + (" 🔥 HIGH" if vol > 1.5 else "")

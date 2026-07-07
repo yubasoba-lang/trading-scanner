@@ -24,6 +24,10 @@ def compute_signals(df: pd.DataFrame) -> dict:
     # Smooth histogram slope over 3 days
     macd_hist_slope = float(macd_hist.iloc[-1] - macd_hist.iloc[-4]) / 3
 
+    # Fast MACD (8/17/9) — more sensitive, catches early crossovers
+    macd_fast_obj = ta.trend.MACD(close, window_slow=17, window_fast=8, window_sign=9)
+    macd_fast_bullish = bool(macd_fast_obj.macd().iloc[-1] > macd_fast_obj.macd_signal().iloc[-1])
+
     bb = ta.volatility.BollingerBands(close)
     bb_high = bb.bollinger_hband()
     bb_low = bb.bollinger_lband()
@@ -56,6 +60,7 @@ def compute_signals(df: pd.DataFrame) -> dict:
         "rsi": round(float(rsi), 1),
         "rsi_slope": round(rsi_slope, 2),       # rising or falling
         "macd_bullish": bool(macd > macd_signal),
+        "macd_fast_bullish": macd_fast_bullish,
         "macd_hist_slope": round(macd_hist_slope, 4),  # momentum accelerating or dying
         "above_bb_mid": bool(price > (bb_high.iloc[-1] + bb_low.iloc[-1]) / 2),
         "bb_position": round(bb_pos, 1),
@@ -181,11 +186,11 @@ def probability_score(signals: dict, spy_regime: dict = None) -> int:
     score = max(0, min(100, score))
 
     # --- MACD veto gate ---
-    # Bearish crossover: cap at 62 — still below the 65 buy threshold,
-    # but allows a strongly aligned setup to show up as a near-miss watchlist candidate.
-    # Below 65 buy threshold so bearish-MACD setups can't trigger a buy.
-    # Bullish crossover: floor at 45 so minor negatives can't flip it to sell.
-    if not signals["macd_bullish"]:
+    # Either standard (12/26/9) or fast (8/17/9) bullish crossover counts.
+    # Fast MACD catches early momentum shifts — higher risk, more signals.
+    # If neither is bullish: cap at 62. If either is bullish: floor at 45.
+    either_bullish = signals["macd_bullish"] or signals.get("macd_fast_bullish", False)
+    if not either_bullish:
         score = min(score, 62)
     else:
         score = max(score, 45)

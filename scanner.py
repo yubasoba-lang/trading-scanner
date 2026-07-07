@@ -128,7 +128,9 @@ def format_report(results: list) -> str:
             else:
                 rsi_label = "neutral"
 
-            macd_label = "bullish crossover" if r["macd_bullish"] else "bearish crossover"
+            macd_std = "bullish" if r["macd_bullish"] else "bearish"
+            macd_fast = "bullish" if r.get("macd_fast_bullish") else "bearish"
+            macd_label = f"{macd_std} (standard 12/26) | {macd_fast} (fast 8/17)"
             vol = r["volume_ratio"]
             vol_label = f"{vol}x avg {'← HIGH VOLUME' if vol > 1.5 else ''}"
 
