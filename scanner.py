@@ -57,6 +57,7 @@ def analyze_ticker(ticker: str, spy_regime: str = "bull") -> dict:
             "rsi_slope": signals["rsi_slope"],
             "ema_trend": signals["ema_trend"],
             "macd_bullish": signals["macd_bullish"],
+            "macd_fast_bullish": signals["macd_fast_bullish"],
             "macd_hist_slope": signals["macd_hist_slope"],
             "volume_ratio": signals["volume_ratio"],
             "volume_building": signals["volume_building"],
