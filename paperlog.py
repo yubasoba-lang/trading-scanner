@@ -1,7 +1,21 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, date
+import pandas_market_calendars as mcal
 from config import STARTING_BALANCE_JPY, USD_JPY_RATE, RISK_PER_TRADE_PCT, MAX_OPEN_TRADES
+
+MAX_TRADE_DAYS = 15  # auto-exit after this many trading days
+
+
+def trading_days_since(date_str: str) -> int:
+    nyse = mcal.get_calendar("NYSE")
+    start = datetime.strptime(date_str, "%Y-%m-%d").date()
+    end = date.today()
+    if end <= start:
+        return 0
+    schedule = nyse.schedule(start_date=start, end_date=end)
+    # subtract 1 so entry day doesn't count as a full day
+    return max(0, len(schedule) - 1)
 
 LOG_FILE = os.path.join(os.path.dirname(__file__), "paper_trades.json")
 
@@ -102,6 +116,7 @@ def update_outcomes():
         price = prices.get(trade["ticker"])
         if not price:
             continue
+        days_held = trading_days_since(trade["date"])
         if price <= trade["sl"]:
             trade["status"] = "stopped_out"
             trade["exit_price"] = trade["sl"]
@@ -112,6 +127,13 @@ def update_outcomes():
             trade["exit_price"] = trade["tp"]
             trade["exit_date"] = datetime.now().strftime("%Y-%m-%d")
             trade["result_pct"] = trade["tp_pct"]
+        elif days_held >= MAX_TRADE_DAYS:
+            result_pct = round((price - trade["entry_price"]) / trade["entry_price"] * 100, 2)
+            trade["status"] = "expired"
+            trade["exit_price"] = price
+            trade["exit_date"] = datetime.now().strftime("%Y-%m-%d")
+            trade["result_pct"] = result_pct
+            print(f"  [{trade['ticker']}] auto-closed after {days_held} trading days at ${price} ({result_pct:+.1f}%)")
 
     save_log(trades)
 
